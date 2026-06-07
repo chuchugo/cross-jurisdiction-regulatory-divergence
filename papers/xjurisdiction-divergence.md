@@ -109,12 +109,15 @@ We seed pairs from documented FDA/EMA divergences in published expert comparison
 (e.g., the ulcerative-colitis endpoint comparison in *J. Crohn's & Colitis*) and
 from primary guidance text (ICH E9(R1), E11A; FDA and EMA guidance documents,
 which are public). Each pair records `{id, topic, fda_text, ema_text, label}`. The
-current release contains **42 pairs**: 24 AGREE, 16 DIVERGE, 2 SILENT, spanning
+combined release contains **101 pairs**: 38 AGREE, 40 DIVERGE, 23 SILENT, spanning
 estimands, pediatric extrapolation, biosimilars, gene therapy, companion
 diagnostics, decentralized trials, dosing, endpoint adjudication, subgroups, risk
-management plans, and quality-of-life endpoints. The class skew (and small SILENT
-support) reflects the natural distribution of expert-flagged comparisons; we
-report macro-F1 to weight all classes equally.
+management plans, ulcerative colitis endpoints, psychiatry trial design, and
+radiopharmaceutical nonclinical requirements. Labels are sourced from three
+open-access expert-panel reviews: a J. Crohn's & Colitis 2025 comparison (40
+pairs), a PMC psychiatric-guidelines comparison (10 pairs), and a PMC
+radiopharmaceutical-requirements comparison (9 pairs); supplemented by 42 pairs
+derived from primary guidance text. We report macro-F1 to weight all classes equally.
 
 ---
 
@@ -143,29 +146,48 @@ Decision rule: shared ICH citation with low conflict → AGREE; very low similar
 → SILENT; conflict above trigger → DIVERGE; high similarity → AGREE; otherwise
 DIVERGE.
 
-### 4.1 Optimization
+### 4.1 Optimization and honest evaluation
 
 We optimized the three decision thresholds (similarity-for-AGREE,
-conflict-trigger, similarity-for-SILENT) by grid search against macro-F1. Results:
+conflict-trigger, similarity-for-SILENT) by grid search, then evaluated honestly
+via **stratified nested 5-fold cross-validation** (inner folds tune thresholds,
+outer folds report; averaged over 5 random seeds) on the combined 101-pair set.
 
-| Iter | Change | Macro-F1 | Acc |
-|------|--------|----------|-----|
-| 0 | baseline lexical cosine + cue heuristics | 0.408 | 0.643 |
-| 1 | refined cue lexicon + modal-strength asymmetry | 0.418 | 0.643 |
-| 2 | light stemming + numeric / one-sided-specificity cue | 0.418 | 0.643 |
-| 3 | threshold grid-search | **0.732** | **0.833** |
+| Method | Macro-F1 (held-out) | Acc |
+|--------|---------------------|-----|
+| Lexical heuristic (nested CV) | 0.549 ± 0.009 | 0.586 |
+| NLI cross-encoder (distilbert-mnli) | 0.271 | 0.277 |
+| **LLM judge (Claude Haiku, direct)** | **0.819** | **0.832** |
 
-The large Iter-3 gain came from lowering the conflict trigger so that a *single*
-divergence cue fires DIVERGE — recovering high-overlap conflict pairs that
-cosine similarity alone scored as AGREE.
+### 4.2 Per-class results
 
-### 4.2 Per-class results (best configuration)
+**Lexical (nested CV):**
 
 | Class | P | R | F1 | n |
 |-------|------|------|------|---|
-| AGREE | 0.840 | 0.875 | 0.857 | 24 |
-| DIVERGE | 0.867 | 0.812 | 0.839 | 16 |
-| SILENT | 0.500 | 0.500 | 0.500 | 2 |
+| AGREE | 0.732 | 0.789 | 0.759 | 38 |
+| DIVERGE | 0.511 | 0.575 | 0.541 | 40 |
+| SILENT | 0.467 | 0.304 | 0.368 | 23 |
+
+**LLM judge (Claude Haiku):**
+
+| Class | P | R | F1 | n |
+|-------|------|------|------|---|
+| AGREE | 0.872 | 0.895 | 0.883 | 38 |
+| DIVERGE | 0.810 | 0.850 | 0.829 | 40 |
+| SILENT | 0.800 | 0.696 | 0.744 | 23 |
+
+---
+
+### 4.3 Key finding: the NLI structural gap
+
+The off-the-shelf NLI model (distilbert-mnli) scores only 0.271, *below* the
+lexical baseline. Beyond model capacity, this surfaces a structural insight:
+**NLI emits only entail / neutral / contradict — it has no native SILENT class.**
+SILENT F1 collapses to 0.085 under NLI, while the LLM judge reaches 0.744 on
+the same SILENT pairs with explicit definitional framing. This confirms that
+SILENT is semantically detectable with the right formulation, but invisible to a
+pair-level entailment framing — an important task-design finding.
 
 ---
 
@@ -192,7 +214,23 @@ modeling each requirement as a graph rather than a bag of words.
 
 ---
 
-## 6. Proposed Method: Dual Policy-Graph / Graph-RAG
+## 6. Discussion: The Remaining Gap and Why It Matters
+
+The LLM judge (0.819 macro-F1) substantially outperforms the lexical heuristic
+(0.549) and nearly matches expert-level agreement on this task. But 0.819 on a
+direct pairwise prompt is not the paper's ceiling — it is the **baseline to beat**
+for the graph-structured method. The residual 18% error rate on 101 pairs
+represents ~18 misclassified pairs; at real-world scale (1,351 FDA documents ×
+176 EMA guidelines) those errors compound into missed regulatory conflicts that
+reach patients.
+
+More concretely, the LLM judge has two failure modes the graph addresses: (1) it
+reasons over two isolated sentences with no context about *which clause of a
+guideline* each requirement belongs to — a graph encodes this structural position;
+(2) it cannot answer "is EMA silent on this entire topic?" from a pair — a
+corpus-level graph query can.
+
+## 7. Proposed Method: Dual Policy-Graph / Graph-RAG
 
 To break the lexical ceiling we propose (and will evaluate in the full paper):
 
@@ -211,7 +249,7 @@ alignment accuracy, explanation faithfulness.
 
 ---
 
-## 7. Open Questions
+## 8. Open Questions
 
 1. Does graph structure beat a strong LLM doing direct comparison?
 2. What is the realistic macro-F1 ceiling on public data with an LLM judge?
@@ -220,15 +258,17 @@ alignment accuracy, explanation faithfulness.
 
 ---
 
-## 8. Conclusion
+## 9. Conclusion
 
-We framed cross-jurisdiction regulatory divergence detection, released a small
-expert-grounded benchmark, and established a reproducible lexical lower bound of
-0.732 macro-F1. The error analysis shows the baseline fails precisely on
-high-overlap / opposed-stance pairs — the cases that define the task's difficulty
-and that motivate a relational, Graph-RAG approach. The next step is to implement
-the dual policy-graph method and measure whether structure delivers the gains the
-lexical ceiling predicts.
+We introduced cross-jurisdiction regulatory divergence detection as an NLP task,
+released a 101-pair expert-grounded benchmark across three therapeutic domains,
+and characterized a baseline hierarchy: lexical heuristic (0.549 macro-F1,
+nested CV) → NLI cross-encoder (0.271, structurally limited by absent SILENT
+class) → LLM judge / Claude Haiku (0.819, direct pairwise). The LLM judge
+establishes a strong flat baseline; the residual errors and its structural
+inability to reason over corpus-level silences motivate the dual policy-graph
+method proposed in §7. The next step is to implement and evaluate that method,
+measuring whether graph structure delivers gains beyond the 0.819 flat-LLM ceiling.
 
 ---
 
