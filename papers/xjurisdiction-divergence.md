@@ -153,11 +153,12 @@ conflict-trigger, similarity-for-SILENT) by grid search, then evaluated honestly
 via **stratified nested 5-fold cross-validation** (inner folds tune thresholds,
 outer folds report; averaged over 5 random seeds) on the combined 101-pair set.
 
-| Method | Macro-F1 (held-out) | Acc |
-|--------|---------------------|-----|
-| Lexical heuristic (nested CV) | 0.549 ± 0.009 | 0.586 |
-| NLI cross-encoder (distilbert-mnli) | 0.271 | 0.277 |
-| **LLM judge (Claude Haiku, direct)** | **0.819** | **0.832** |
+| Method | Macro-F1 | Acc | Notes |
+|--------|----------|-----|-------|
+| Lexical heuristic | 0.549 ± 0.009 | 0.586 | nested CV; fully offline |
+| NLI cross-encoder (distilbert-mnli) | 0.271 | 0.277 | structurally limited |
+| Graph-RAG / pair-level triplets | 0.698 | 0.703 | obligation-level extraction |
+| **LLM judge (Claude Haiku, direct)** | **0.819** | **0.832** | flat pairwise; no graph |
 
 ### 4.2 Per-class results
 
@@ -214,21 +215,34 @@ modeling each requirement as a graph rather than a bag of words.
 
 ---
 
-## 6. Discussion: The Remaining Gap and Why It Matters
+## 6. Discussion: What the Baseline Hierarchy Reveals
 
-The LLM judge (0.819 macro-F1) substantially outperforms the lexical heuristic
-(0.549) and nearly matches expert-level agreement on this task. But 0.819 on a
-direct pairwise prompt is not the paper's ceiling — it is the **baseline to beat**
-for the graph-structured method. The residual 18% error rate on 101 pairs
-represents ~18 misclassified pairs; at real-world scale (1,351 FDA documents ×
-176 EMA guidelines) those errors compound into missed regulatory conflicts that
-reach patients.
+Four methods, one coherent story:
 
-More concretely, the LLM judge has two failure modes the graph addresses: (1) it
-reasons over two isolated sentences with no context about *which clause of a
-guideline* each requirement belongs to — a graph encodes this structural position;
-(2) it cannot answer "is EMA silent on this entire topic?" from a pair — a
-corpus-level graph query can.
+**Lexical heuristic (0.549)** is reproducible, free, and establishes that surface
+features alone are insufficient — high-overlap / opposed-stance pairs defeat it.
+
+**NLI cross-encoder (0.271)** reveals a structural incompatibility: standard NLI
+has no SILENT class. SILENT F1 collapses to 0.085 under NLI framing but recovers
+to 0.744 under explicit LLM framing — confirming SILENT is semantically detectable
+but invisible to entailment-only formulations.
+
+**Graph-RAG / pair-level triplets (0.698)** extracts obligation-level structure
+(MANDATORY / RECOMMENDED / PERMITTED / SILENT) per jurisdiction and classifies
+based on obligation alignment. This beats the lexical baseline by +0.15 F1, but
+*loses to the flat LLM judge* — because it discards the full text context that
+lets the LLM distinguish "same requirement, different modal register" (AGREE) from
+"same topic, different threshold" (DIVERGE). The graph adds noise at the pair
+level precisely when it over-generalizes obligation levels.
+
+**Flat LLM judge (0.819)** is the strongest pair-level baseline. It leverages full
+text context that the graph's triplets abstract away.
+
+**The key finding:** at *pair level*, graph structure over isolated sentences does
+not beat a flat LLM with definitional framing. The graph's real value is at the
+*corpus level* — answering "is EMA silent on this topic *anywhere* in its entire
+guideline corpus?" is a query that a pair-level LLM cannot make but a corpus-level
+policy graph can. That corpus-level gap is the architectural motivation for §7.
 
 ## 7. Proposed Method: Dual Policy-Graph / Graph-RAG
 
@@ -262,13 +276,19 @@ alignment accuracy, explanation faithfulness.
 
 We introduced cross-jurisdiction regulatory divergence detection as an NLP task,
 released a 101-pair expert-grounded benchmark across three therapeutic domains,
-and characterized a baseline hierarchy: lexical heuristic (0.549 macro-F1,
-nested CV) → NLI cross-encoder (0.271, structurally limited by absent SILENT
-class) → LLM judge / Claude Haiku (0.819, direct pairwise). The LLM judge
-establishes a strong flat baseline; the residual errors and its structural
-inability to reason over corpus-level silences motivate the dual policy-graph
-method proposed in §7. The next step is to implement and evaluate that method,
-measuring whether graph structure delivers gains beyond the 0.819 flat-LLM ceiling.
+and systematically characterized a four-method baseline hierarchy: lexical
+heuristic (0.549) → NLI cross-encoder (0.271, SILENT structurally invisible) →
+graph-RAG pair-level triplets (0.698) → flat LLM judge / Claude Haiku (0.819).
+The hierarchy yields three concrete findings: (1) SILENT is semantically
+detectable but invisible to entailment framing — a task-design insight;
+(2) obligation-level graph structure improves over lexical heuristics (+0.15 F1)
+but loses to flat LLM when it discards the content context; (3) the flat LLM
+(0.819) is the pair-level ceiling — the graph method's value is architectural,
+enabling corpus-level silent detection and explainable obligation chains, not
+pair-level accuracy gains. The natural next contribution is corpus-level
+policy-graph construction across the full FDA and EMA guideline corpora, where
+"is this topic unaddressed by EMA?" becomes a graph query rather than a pairwise
+judgment.
 
 ---
 
