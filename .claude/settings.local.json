@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:aime26.aimedicine.info)",
+      "WebFetch(domain:mie2026.efmi.org)",
+      "WebFetch(domain:amia.org)",
+      "WebFetch(domain:arxiv.org)",
+      "WebFetch(domain:2026.emnlp.org)",
+      "WebFetch(domain:aclanthology.org)",
+      "Bash(python3 -c \"import numpy, sklearn; print\\('numpy+sklearn OK'\\)\")",
+      "Bash(python3 benchmark.py -v)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(mkdir -p papers)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -m pip show pi-autoresearch)",
+      "Bash(pip show *)"
+    ]
+  }
+}
