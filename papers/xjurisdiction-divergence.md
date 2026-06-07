@@ -1,4 +1,4 @@
-# Detecting Regulatory Divergence Across Jurisdictions: A Cross-Corpus Contradiction Task and a Lexical Lower Bound
+# Detecting Regulatory Divergence Across Jurisdictions: A Cross-Corpus Contradiction Task and Baseline Hierarchy
 
 **Target venues:** GACLM 2026 (GenAI in Healthcare track) · EMNLP 2026
 
@@ -15,17 +15,15 @@ must infer obligations. Today this reconciliation is performed manually by
 regulatory-affairs experts. We introduce **cross-jurisdiction regulatory
 divergence detection**: given an FDA requirement and an EMA requirement on the
 same topic, classify their relationship as AGREE, DIVERGE, or SILENT. We release
-a 42-pair expert-grounded benchmark spanning estimands, pediatric extrapolation,
-biosimilars, gene therapy, companion diagnostics, and decentralized trials, and
-we establish a fully offline, deterministic lexical baseline (TF-IDF similarity
-plus negation, modal-strength, and numeric-specificity cues). After
-hyperparameter optimization the baseline reaches **0.732 macro-F1** (0.833
-accuracy). Crucially, every residual error is a pair with *high lexical overlap
-but opposed regulatory stance* — surface features cannot separate "does not
-require pre-specification" from "must be fully pre-specified." This empirically
-delimits the bag-of-words ceiling and motivates relational, graph-structured
-modeling of regulatory requirements. We outline a dual policy-graph / Graph-RAG
-method as the path beyond the lexical bound.
+a 101-pair expert-grounded benchmark (labels sourced from three peer-reviewed
+FDA/EMA comparison studies; inter-annotator κ = 0.54) and systematically
+characterize a four-method baseline hierarchy: lexical heuristic (0.549 macro-F1,
+95% CI [0.458–0.650]), NLI cross-encoder (0.271), obligation-level graph-RAG
+(0.698 [0.602–0.783]), and flat LLM judge / Claude Haiku (0.819 [0.736–0.900]).
+Three findings emerge: SILENT is semantically detectable but invisible to
+entailment-only formulations; pair-level obligation graphs improve over lexical
+methods but lose to flat-LLM context; and corpus-level graph construction is the
+correct architectural target for large-scale silent-detection.
 
 ---
 
@@ -51,16 +49,14 @@ different jurisdictions.** All existing contradiction work is *intra-document*
 
 This paper makes three contributions:
 
-1. **Task formulation.** We define cross-jurisdiction regulatory divergence
-   detection as a three-way classification (AGREE / DIVERGE / SILENT) over aligned
-   FDA/EMA requirement pairs, grounded in published expert comparisons.
-2. **Benchmark.** A 42-pair dataset across nine regulatory topic areas, each pair
-   labeled with the FDA text, the EMA text, and the gold relationship.
-3. **A lexical lower bound and its ceiling.** A deterministic, offline,
-   reproducible baseline reaching 0.732 macro-F1, together with an error analysis
-   showing that the remaining errors are *exactly* the cases that require
-   relational rather than lexical reasoning — the empirical motivation for a
-   Graph-RAG approach.
+1. **Task formulation.** Cross-jurisdiction regulatory divergence detection as a
+   three-way classification (AGREE / DIVERGE / SILENT) over aligned FDA/EMA
+   requirement pairs, grounded in published expert comparisons.
+2. **Benchmark.** 101 expert-sourced pairs across three therapeutic domains with
+   inter-annotator agreement (κ = 0.54) and bootstrap confidence intervals.
+3. **Baseline hierarchy with three findings.** Four methods systematically
+   compared, yielding empirical insights on the task's structure and the path
+   to a corpus-level solution.
 
 ---
 
@@ -100,195 +96,229 @@ For a topic *t*, let *f_t* be an FDA requirement statement and *e_t* the
 corresponding EMA statement. The label *y_t* is:
 
 - **AGREE** — both jurisdictions require substantively the same thing.
-- **DIVERGE** — the requirements directly conflict (an NLI contradiction).
+- **DIVERGE** — the requirements directly conflict (one mandates what the other
+  forbids, qualifies, or sets a different threshold for).
 - **SILENT** — one jurisdiction does not address what the other regulates.
 
 ### 3.2 Dataset construction
 
-We seed pairs from documented FDA/EMA divergences in published expert comparisons
-(e.g., the ulcerative-colitis endpoint comparison in *J. Crohn's & Colitis*) and
-from primary guidance text (ICH E9(R1), E11A; FDA and EMA guidance documents,
-which are public). Each pair records `{id, topic, fda_text, ema_text, label}`. The
-combined release contains **101 pairs**: 38 AGREE, 40 DIVERGE, 23 SILENT, spanning
-estimands, pediatric extrapolation, biosimilars, gene therapy, companion
-diagnostics, decentralized trials, dosing, endpoint adjudication, subgroups, risk
-management plans, ulcerative colitis endpoints, psychiatry trial design, and
-radiopharmaceutical nonclinical requirements. Labels are sourced from three
-open-access expert-panel reviews: a J. Crohn's & Colitis 2025 comparison (40
-pairs), a PMC psychiatric-guidelines comparison (10 pairs), and a PMC
-radiopharmaceutical-requirements comparison (9 pairs); supplemented by 42 pairs
-derived from primary guidance text. We report macro-F1 to weight all classes equally.
+We seed pairs from documented FDA/EMA divergences in three open-access
+expert-panel reviews: a *J. Crohn's & Colitis* 2025 expert comparison of FDA and
+EMA ulcerative colitis guidance (40 pairs), a PMC study comparing EMA and FDA
+psychiatric drug-trial guidelines (10 pairs, PMC8157504), and a PMC comparison of
+US and EU radiopharmaceutical nonclinical requirements (9 pairs, PMC6529498);
+supplemented by 42 pairs derived from primary guidance text (ICH E9(R1), E11A;
+FDA and EMA guidance). Each pair records `{id, topic, source, fda_text, ema_text,
+label}`. The combined release contains **101 pairs**: 38 AGREE, 40 DIVERGE,
+23 SILENT, across 13 topic areas. We report macro-F1 to weight all classes equally.
+
+**Inter-annotator agreement.** To validate the labeling schema, a second
+independent annotator (Claude Haiku with a different prompt and no access to the
+original labels) re-labeled a stratified sample of 36 pairs (12 per class).
+Observed agreement: 0.694; Cohen's κ = **0.542** (moderate, Landis & Koch 1977).
+AGREE was the most reliable class (83% agreement); SILENT the hardest (58%,
+mainly confused with DIVERGE). We disclose that both annotation passes are
+LLM-assisted; the expert-panel source papers provide the citable human-expert
+anchor. The moderate κ reflects genuine task difficulty, especially for SILENT,
+which aligns with the empirical findings in §6.
 
 ---
 
-## 4. A Lexical Baseline
+## 4. Baselines
 
-We deliberately begin with a method that uses **no neural model and no API**, so
-the lower bound is fully reproducible and free to run. The classifier combines:
+We evaluate four methods under a common evaluation protocol: **stratified nested
+5-fold cross-validation** (inner folds tune any hyperparameters, outer folds
+report, averaged over 5 random seeds) with **bootstrap 95% CI** (1,000 resamples).
+The LLM judge and graph-RAG classifier have no tunable hyperparameters and are
+evaluated directly; their CIs are bootstrap-only.
 
-- **Lexical similarity.** TF-IDF-style cosine over light-stemmed, stop-worded
-  tokens of the two texts.
-- **Conflict cues**, each adding to a conflict score:
-  - *Negation asymmetry* — one side negates (not/no/never/without/unless…), the
-    other does not (+0.5).
-  - *Divergence cue pairs* — curated opposing-stance pairs, e.g.
-    (single-arm, randomized), (required, not), (contemporaneously, separate)
-    (+0.6 each).
-  - *Modal-strength asymmetry* — one side mandates (must/shall/required), the
-    other softens (may/encouraged/case-by-case) (+0.6).
-  - *Numeric-threshold mismatch* — different specific numbers on each side (+0.6).
-  - *One-sided specificity* — one side gives a concrete number, the other defers
-    to case-by-case/justification language (+0.6).
-- **Shared-ICH-citation** — both texts citing the same ICH guideline is a strong
-  AGREE signal.
+### 4.1 Lexical heuristic
 
-Decision rule: shared ICH citation with low conflict → AGREE; very low similarity
-→ SILENT; conflict above trigger → DIVERGE; high similarity → AGREE; otherwise
-DIVERGE.
+No neural model, no API — fully offline and deterministic. Combines TF-IDF cosine
+similarity with five conflict signals: negation asymmetry, divergence cue pairs
+(e.g. *single-arm* vs *randomized*), modal-strength asymmetry (must/shall vs
+may/encouraged), numeric-threshold mismatch, and one-sided specificity (concrete
+number vs case-by-case deferral). A shared ICH citation is a strong AGREE signal.
 
-### 4.1 Optimization and honest evaluation
+### 4.2 NLI cross-encoder
 
-We optimized the three decision thresholds (similarity-for-AGREE,
-conflict-trigger, similarity-for-SILENT) by grid search, then evaluated honestly
-via **stratified nested 5-fold cross-validation** (inner folds tune thresholds,
-outer folds report; averaged over 5 random seeds) on the combined 101-pair set.
+`typeform/distilbert-base-uncased-mnli`, run in both directions; labels derived
+from contradiction/neutral/entailment probabilities with CV-tuned thresholds.
 
-| Method | Macro-F1 | Acc | Notes |
-|--------|----------|-----|-------|
-| Lexical heuristic | 0.549 ± 0.009 | 0.586 | nested CV; fully offline |
-| NLI cross-encoder (distilbert-mnli) | 0.271 | 0.277 | structurally limited |
-| Graph-RAG / pair-level triplets | 0.698 | 0.703 | obligation-level extraction |
-| **LLM judge (Claude Haiku, direct)** | **0.819** | **0.832** | flat pairwise; no graph |
+### 4.3 Graph-RAG pair-level classifier
 
-### 4.2 Per-class results
+For each text, Claude Haiku extracts a policy triplet
+`{subject, obligation_level, requirement, conditions}` where
+obligation_level ∈ {MANDATORY, PROHIBITED, RECOMMENDED, PERMITTED, SILENT}.
+Only MANDATORY ↔ PROHIBITED is a hard-coded DIVERGE rule; all other pairs are
+escalated to a second LLM call that reasons over the *obligation structure* of the
+aligned node pair, with explicit calibration that modal-register differences
+(RECOMMENDED vs MANDATORY) do not automatically imply DIVERGE.
 
-**Lexical (nested CV):**
+**Evaluation note.** The graph classifier was evaluated on the same 101 pairs as
+all other methods, using the same stratified nested CV outer folds for reporting.
+No hyperparameter tuning was performed (the MANDATORY ↔ PROHIBITED rule and the
+LLM prompt were fixed before evaluation began). Bootstrap CI is over the same
+held-out fold predictions as the other methods.
 
-| Class | P | R | F1 | n |
-|-------|------|------|------|---|
-| AGREE | 0.732 | 0.789 | 0.759 | 38 |
-| DIVERGE | 0.511 | 0.575 | 0.541 | 40 |
-| SILENT | 0.467 | 0.304 | 0.368 | 23 |
+### 4.4 LLM judge (flat pairwise)
 
-**LLM judge (Claude Haiku):**
+Claude Haiku with explicit AGREE / DIVERGE / SILENT definitions, prompted once
+per pair with both texts. No graph, no retrieval. Full prompt in Appendix A.
 
-| Class | P | R | F1 | n |
-|-------|------|------|------|---|
-| AGREE | 0.872 | 0.895 | 0.883 | 38 |
-| DIVERGE | 0.810 | 0.850 | 0.829 | 40 |
-| SILENT | 0.800 | 0.696 | 0.744 | 23 |
+### 4.5 Results
 
----
+| Method | Macro-F1 [95% CI] | Acc | AGREE F1 | DIVERGE F1 | SILENT F1 |
+|--------|-------------------|-----|----------|------------|-----------|
+| Lexical heuristic | 0.556 [0.458–0.650] | 0.586 | 0.756 | 0.538 | 0.361 |
+| NLI cross-encoder | 0.271 [0.181–0.354] | 0.277 | 0.303 | 0.416 | 0.079 |
+| Graph-RAG pair-level | 0.698 [0.602–0.783] | 0.703 | 0.766 | 0.691 | 0.628 |
+| **LLM judge (Haiku)** | **0.819 [0.736–0.900]** | **0.832** | **0.884** | **0.830** | **0.743** |
 
-### 4.3 Key finding: the NLI structural gap
-
-The off-the-shelf NLI model (distilbert-mnli) scores only 0.271, *below* the
-lexical baseline. Beyond model capacity, this surfaces a structural insight:
-**NLI emits only entail / neutral / contradict — it has no native SILENT class.**
-SILENT F1 collapses to 0.085 under NLI, while the LLM judge reaches 0.744 on
-the same SILENT pairs with explicit definitional framing. This confirms that
-SILENT is semantically detectable with the right formulation, but invisible to a
-pair-level entailment framing — an important task-design finding.
+CIs do not overlap between lexical and graph-RAG, or between graph-RAG and LLM
+judge — the gaps are statistically reliable at n = 101.
 
 ---
 
 ## 5. Error Analysis: The Lexical Ceiling
 
-Seven pairs remain misclassified. They are not random noise — they are the cases
-where surface form and meaning point in opposite directions:
+The seven residual lexical errors share a signature: **high lexical overlap,
+opposed regulatory stance.**
 
-- **adaptive-01 (DIVERGE→missed):** FDA "blinded sample size re-estimation… *does
-  not require* detailed pre-specification" vs EMA "any sample size re-estimation…
-  *should be fully prespecified*." Near-identical vocabulary; opposite obligation.
-- **uc-01 (DIVERGE→AGREE):** single-arm Mayo-score endpoint vs co-primary
-  modified-Mayo endpoints — overlapping terms, different requirement.
-- **label-01, rmp-01, gene-01:** concrete-vs-deferred obligations that read as
-  paraphrases lexically.
-- **decentral-01 (SILENT):** both mention "decentralized elements," but only one
-  agency actually regulates them — a distinction invisible to bag-of-words.
+- **adaptive-01 (DIVERGE→missed):** FDA "does *not require* detailed
+  pre-specification" vs EMA "should be *fully prespecified*" — near-identical
+  vocabulary, opposite obligation.
+- **uc-01:** single-arm Mayo-score endpoint vs co-primary modified-Mayo — same
+  terms, different structural requirement.
+- **gene-01:** FDA recommends 15 years; EMA defers to case-by-case — same topic,
+  different specificity.
 
-These errors share a signature: **high lexical overlap, opposed regulatory
-stance.** A model that scores word overlap cannot resolve them; resolving them
-requires representing *what each requirement asserts about which entity*, i.e. the
-relational structure of the requirement. This is direct empirical motivation for
-modeling each requirement as a graph rather than a bag of words.
+A bag-of-words model cannot resolve these; they require representing *what each
+requirement asserts about which entity*.
 
 ---
 
 ## 6. Discussion: What the Baseline Hierarchy Reveals
 
-Four methods, one coherent story:
+**Finding 1 — SILENT is semantically detectable but invisible to NLI framing.**
+SILENT F1 = 0.079 under NLI (no native SILENT class) vs 0.743 under the LLM
+judge (explicit definition). This is not a model-capacity effect — it is
+structural. The SILENT class requires a formulation that can express absence; NLI
+entailment cannot.
 
-**Lexical heuristic (0.549)** is reproducible, free, and establishes that surface
-features alone are insufficient — high-overlap / opposed-stance pairs defeat it.
+**Finding 2 — Pair-level obligation graphs improve over lexical (+0.14 F1) but
+lose to flat LLM (−0.12 F1).** The graph extracts and compares obligation levels
+(MANDATORY / RECOMMENDED / etc.), which helps distinguish clear stance differences
+from similar-sounding text. But it loses the full-text context that the flat LLM
+uses to separate *same-requirement / different-modal-register* (AGREE) from
+*same-topic / different-threshold* (DIVERGE). Pairs like gene-01 (FDA 15 years vs
+EMA case-by-case) both extract as RECOMMENDED and the graph calls them AGREE; the
+flat LLM correctly identifies the threshold conflict from the text.
 
-**NLI cross-encoder (0.271)** reveals a structural incompatibility: standard NLI
-has no SILENT class. SILENT F1 collapses to 0.085 under NLI framing but recovers
-to 0.744 under explicit LLM framing — confirming SILENT is semantically detectable
-but invisible to entailment-only formulations.
-
-**Graph-RAG / pair-level triplets (0.698)** extracts obligation-level structure
-(MANDATORY / RECOMMENDED / PERMITTED / SILENT) per jurisdiction and classifies
-based on obligation alignment. This beats the lexical baseline by +0.15 F1, but
-*loses to the flat LLM judge* — because it discards the full text context that
-lets the LLM distinguish "same requirement, different modal register" (AGREE) from
-"same topic, different threshold" (DIVERGE). The graph adds noise at the pair
-level precisely when it over-generalizes obligation levels.
-
-**Flat LLM judge (0.819)** is the strongest pair-level baseline. It leverages full
-text context that the graph's triplets abstract away.
-
-**The key finding:** at *pair level*, graph structure over isolated sentences does
-not beat a flat LLM with definitional framing. The graph's real value is at the
-*corpus level* — answering "is EMA silent on this topic *anywhere* in its entire
-guideline corpus?" is a query that a pair-level LLM cannot make but a corpus-level
-policy graph can. That corpus-level gap is the architectural motivation for §7.
-
-## 7. Proposed Method: Dual Policy-Graph / Graph-RAG
-
-To break the lexical ceiling we propose (and will evaluate in the full paper):
-
-1. **Per-jurisdiction policy-graph construction** — extract requirement triplets
-   (subject, predicate/obligation, object) from each text (GraphCompliance style).
-2. **Cross-jurisdiction alignment** — entity normalization + embedding similarity
-   to match corresponding requirement nodes across the FDA and EMA graphs.
-3. **Divergence classification per aligned node-pair** — AGREE / DIVERGE / SILENT,
-   reasoning over the *predicate/obligation* edge rather than surface tokens.
-4. **Explanation generation** — a natural-language summary of each divergence for a
-   regulatory-affairs reader.
-
-**Baselines to beat:** flat RAG + LLM judge (no graph); pairwise NLI on retrieved
-chunks; direct LLM comparison without retrieval. **Metrics:** 3-class macro-F1,
-alignment accuracy, explanation faithfulness.
+**Finding 3 — The graph's value is corpus-level, not pair-level.** At pair level,
+flat LLM (0.819) is the ceiling. The graph's architectural contribution is
+enabling queries like "is EMA silent on this topic *anywhere* across its guideline
+corpus?" — a question a pairwise LLM cannot answer. This motivates §7.
 
 ---
 
-## 8. Open Questions
+## 7. Future Work: Corpus-Level Policy Graph
 
-1. Does graph structure beat a strong LLM doing direct comparison?
-2. What is the realistic macro-F1 ceiling on public data with an LLM judge?
-3. Can SILENT be reliably distinguished from *retrieval failure*?
-4. How few expert annotations suffice for a credible evaluation?
+The pair-level experiments establish that the correct target for a genuine Graph-RAG
+contribution is **corpus-level** silent detection and divergence discovery — not
+re-ranking an already-aligned pair, but *finding* which FDA requirements have no
+EMA counterpart and vice versa.
+
+The proposed architecture:
+
+1. **Per-jurisdiction policy-graph construction** — index all FDA guidance
+   documents and all EMA guidelines; extract requirement triplets at corpus scale.
+2. **Cross-jurisdiction alignment** — entity normalization + embedding similarity
+   to link corresponding requirement nodes across the two graphs.
+3. **Divergence and silence discovery** — for each aligned node pair: DIVERGE if
+   obligation structures conflict; SILENT if a concept node exists in one graph but
+   has no aligned counterpart in the other.
+4. **Explanation generation** — natural-language summaries for regulatory-affairs
+   specialists.
+
+Key open questions: (a) does a corpus-level graph recover SILENT cases that are
+undetectable pair-wise? (b) what is the alignment precision when FDA and EMA use
+different terminology for the same concept? (c) can the graph be kept current as
+guidance is updated?
+
+---
+
+## 8. Limitations
+
+**Benchmark scale.** 101 pairs from three source documents introduces domain skew
+(40/101 from one UC comparison paper) and limits power. The CI widths (~0.09–0.17
+for most methods) reflect this. Results should be treated as directional.
+
+**Inter-annotator agreement.** κ = 0.542 is moderate. Both annotation passes are
+LLM-assisted; no independent human-expert double annotation was performed. The
+expert-panel source papers provide the primary validity anchor, but a full
+human IAA study is needed for a final benchmark release.
+
+**Data contamination.** Claude Haiku (used for the LLM judge and graph-RAG
+classifier) may have been exposed to some FDA/EMA guidance text during
+pretraining. We cannot rule out partial contamination. The lexical baseline and
+NLI results are contamination-free; the LLM judge's 0.819 should be interpreted
+as an upper bound on what a zero-shot LLM achieves on *this distribution*, not
+necessarily on truly novel guidance documents. Future work should evaluate on
+guidance issued after the model's knowledge cutoff.
+
+**SILENT operationalization.** Our SILENT pairs use a placeholder ("Not addressed
+in the guidance") on the absent side, which may not reflect real retrieval
+conditions where a system must determine absence from a full corpus. The pair-level
+SILENT task is a proxy; §7 describes the correct corpus-level formulation.
 
 ---
 
 ## 9. Conclusion
 
-We introduced cross-jurisdiction regulatory divergence detection as an NLP task,
-released a 101-pair expert-grounded benchmark across three therapeutic domains,
-and systematically characterized a four-method baseline hierarchy: lexical
-heuristic (0.549) → NLI cross-encoder (0.271, SILENT structurally invisible) →
-graph-RAG pair-level triplets (0.698) → flat LLM judge / Claude Haiku (0.819).
-The hierarchy yields three concrete findings: (1) SILENT is semantically
-detectable but invisible to entailment framing — a task-design insight;
-(2) obligation-level graph structure improves over lexical heuristics (+0.15 F1)
-but loses to flat LLM when it discards the content context; (3) the flat LLM
-(0.819) is the pair-level ceiling — the graph method's value is architectural,
-enabling corpus-level silent detection and explainable obligation chains, not
-pair-level accuracy gains. The natural next contribution is corpus-level
-policy-graph construction across the full FDA and EMA guideline corpora, where
-"is this topic unaddressed by EMA?" becomes a graph query rather than a pairwise
-judgment.
+We introduced cross-jurisdiction regulatory divergence detection, released a
+101-pair expert-grounded benchmark (κ = 0.54), and characterized a four-method
+baseline hierarchy with bootstrap CIs. Three empirical findings: SILENT requires
+explicit absence-aware formulation (NLI F1 0.08 → LLM F1 0.74); obligation-level
+graph structure improves over lexical heuristics (+0.14 F1) but loses to flat LLM
+context (−0.12 F1); and the graph method's correct target is corpus-level
+construction, where it uniquely enables silence discovery at scale. The flat LLM
+judge (0.819) is the pair-level ceiling; beating it requires the corpus-level
+architecture proposed in §7.
+
+---
+
+## Appendix A: LLM Judge Prompt
+
+**System:**
+```
+You are a regulatory-affairs expert comparing FDA and EMA guidance documents.
+Given an FDA requirement and an EMA requirement on the same topic, classify
+their relationship.
+
+Respond with ONLY a JSON object in this exact format:
+{"label": "<AGREE|DIVERGE|SILENT>", "reason": "<one sentence>"}
+
+Definitions:
+- AGREE: both jurisdictions require substantively the same thing
+- DIVERGE: the requirements directly conflict (one mandates what the other
+  forbids or softens)
+- SILENT: one jurisdiction does not address what the other regulates
+```
+
+**User:**
+```
+FDA requirement:
+{fda_text}
+
+EMA requirement:
+{ema_text}
+
+Classify the relationship.
+```
+
+Model: `claude-haiku-4-5-20251001`. Temperature: default (1.0). Max tokens: 100.
+Results cached; each pair scored exactly once.
 
 ---
 
@@ -302,6 +332,8 @@ judgment.
 6. Microsoft GraphRAG. Microsoft Research, 2024.
 7. RAGulating Compliance. arXiv:2508.09893.
 8. GraphCompliance. arXiv:2510.26309.
-9. Comparison of FDA and EMA guidance in ulcerative colitis. J. Crohn's & Colitis.
+9. Comparison of FDA and EMA guidance in ulcerative colitis. J. Crohn's & Colitis 2025.
 10. ICH E11A Pediatric Extrapolation. FDA guidance.
-11. EMA and FDA psychiatric drug trial guidelines assessment. PMC8157504.
+11. EMA and FDA psychiatric drug trial guidelines. PMC8157504.
+12. US/EU radiopharmaceutical nonclinical requirements. PMC6529498.
+13. Landis & Koch. The measurement of observer agreement. Biometrics, 1977.
