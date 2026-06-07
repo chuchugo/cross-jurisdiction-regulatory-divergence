@@ -15,7 +15,11 @@
       "Bash(mkdir -p papers)",
       "Bash(python3 -c ' *)",
       "Bash(python3 -m pip show pi-autoresearch)",
-      "Bash(pip show *)"
+      "Bash(pip show *)",
+      "Bash(git rm *)",
+      "WebFetch(domain:academic.oup.com)",
+      "WebFetch(domain:www.ncbi.nlm.nih.gov)",
+      "WebFetch(domain:pmc.ncbi.nlm.nih.gov)"
     ]
   }
 }
