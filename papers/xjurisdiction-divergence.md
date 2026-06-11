@@ -113,14 +113,20 @@ label}`. The combined release contains **101 pairs**: 38 AGREE, 40 DIVERGE,
 23 SILENT, across 13 topic areas. We report macro-F1 to weight all classes equally.
 
 **Inter-annotator agreement.** To validate the labeling schema, a second
-independent annotator (Claude Haiku with a different prompt and no access to the
-original labels) re-labeled a stratified sample of 36 pairs (12 per class).
-Observed agreement: 0.694; Cohen's κ = **0.542** (moderate, Landis & Koch 1977).
-AGREE was the most reliable class (83% agreement); SILENT the hardest (58%,
-mainly confused with DIVERGE). We disclose that both annotation passes are
+independent annotator (Claude Haiku with a deliberately different prompt and no
+access to the original labels) re-labeled a stratified sample of 36 pairs (12 per
+class). Observed agreement: 0.694; Cohen's κ = **0.542** (moderate, Landis & Koch
+1977). AGREE was the most reliable class (83% agreement); SILENT the hardest
+(58%, mainly confused with DIVERGE). We disclose that both annotation passes are
 LLM-assisted; the expert-panel source papers provide the citable human-expert
-anchor. The moderate κ reflects genuine task difficulty, especially for SILENT,
-which aligns with the empirical findings in §6.
+anchor. The moderate κ is below the conventional 0.60 threshold and reflects
+genuine task difficulty — SILENT requires determining absence of regulation, which
+is inherently more ambiguous than detecting presence of conflict. This ambiguity is
+independently confirmed by the empirical gap between NLI SILENT F1 (0.079) and LLM
+SILENT F1 (0.743) in §4.5, and by the fact that SILENT is where the pair-level
+graph also struggles most. We treat κ = 0.542 as a characterization of task
+difficulty rather than a quality failure, and recommend that a full human-expert
+IAA study be conducted for the camera-ready benchmark release.
 
 ---
 
@@ -143,7 +149,13 @@ number vs case-by-case deferral). A shared ICH citation is a strong AGREE signal
 ### 4.2 NLI cross-encoder
 
 `typeform/distilbert-base-uncased-mnli`, run in both directions; labels derived
-from contradiction/neutral/entailment probabilities with CV-tuned thresholds.
+from contradiction/neutral/entailment probabilities with CV-tuned thresholds. We
+use DistilBERT-MNLI as a representative off-the-shelf NLI system. The structural
+SILENT gap finding (§6, Finding 1) is model-agnostic: any NLI model lacking an
+explicit SILENT output class will map absence-of-regulation to *neutral*, collapsing
+SILENT recall. Substituting DeBERTa-v3-large or a modern cross-encoder would
+improve AGREE/DIVERGE F1 but would not resolve the SILENT structural gap without
+task-specific supervision.
 
 ### 4.3 Graph-RAG pair-level classifier
 
@@ -168,12 +180,18 @@ per pair with both texts. No graph, no retrieval. Full prompt in Appendix A.
 
 ### 4.5 Results
 
-| Method | Macro-F1 [95% CI] | Acc | AGREE F1 | DIVERGE F1 | SILENT F1 |
-|--------|-------------------|-----|----------|------------|-----------|
-| Lexical heuristic | 0.556 [0.458–0.650] | 0.586 | 0.756 | 0.538 | 0.361 |
-| NLI cross-encoder | 0.271 [0.181–0.354] | 0.277 | 0.303 | 0.416 | 0.079 |
-| Graph-RAG pair-level | 0.698 [0.602–0.783] | 0.703 | 0.766 | 0.691 | 0.628 |
-| **LLM judge (Haiku)** | **0.819 [0.736–0.900]** | **0.832** | **0.884** | **0.830** | **0.743** |
+| Method | Macro-F1 [95% CI] | Acc | AGREE F1 [CI] | DIVERGE F1 [CI] | SILENT F1 [CI] |
+|--------|-------------------|-----|---------------|-----------------|----------------|
+| Lexical heuristic¹ | 0.556 [0.458–0.650] | 0.586 | 0.756 [0.648–0.849] | 0.538 [0.400–0.660] | 0.361 [0.167–0.545] |
+| NLI cross-encoder² | 0.271 [0.181–0.354] | 0.277 | 0.303 [0.118–0.481] | 0.416 [0.278–0.545] | 0.079 [0.000–0.177] |
+| Graph-RAG pair-level³ | 0.698 [0.602–0.783] | 0.703 | 0.766 [0.646–0.860] | 0.691 [0.554–0.806] | 0.628 [0.468–0.764] |
+| **LLM judge (Haiku)⁴** | **0.819 [0.736–0.900]** | **0.832** | **0.884 [0.800–0.951]** | **0.830 [0.737–0.911]** | **0.743 [0.579–0.878]** |
+
+¹ Nested 5-fold CV, 5 seeds; thresholds tuned on inner folds only. ² Same CV protocol,
+thresholds tuned on inner folds. ³ No tunable hyperparameters; evaluated on all 101 pairs
+using same outer-fold splits; bootstrap CI only. ⁴ `claude-haiku-4-5-20251001`, default
+temperature; no tunable hyperparameters; bootstrap CI only. Estimated cost: ~$0.10 for all
+101 pairs (cached; each pair scored exactly once).
 
 CIs do not overlap between lexical and graph-RAG, or between graph-RAG and LLM
 judge — the gaps are statistically reliable at n = 101.
@@ -215,10 +233,14 @@ uses to separate *same-requirement / different-modal-register* (AGREE) from
 EMA case-by-case) both extract as RECOMMENDED and the graph calls them AGREE; the
 flat LLM correctly identifies the threshold conflict from the text.
 
-**Finding 3 — The graph's value is corpus-level, not pair-level.** At pair level,
-flat LLM (0.819) is the ceiling. The graph's architectural contribution is
-enabling queries like "is EMA silent on this topic *anywhere* across its guideline
-corpus?" — a question a pairwise LLM cannot answer. This motivates §7.
+**Finding 3 — Two distinct ceilings for two different problem scopes.** The
+*pair-level ceiling* is the flat LLM judge (0.819): given two aligned sentences
+and explicit definitions, an LLM nearly saturates the task. The *corpus-level
+ceiling* is the domain of the graph method: "is EMA silent on this topic *anywhere*
+across its guideline corpus?" is a query a pairwise LLM cannot make but a
+corpus-level policy graph can. These are different tasks with different upper
+bounds. This paper measures and establishes the pair-level ceiling; §7 motivates
+the corpus-level architecture as the natural next contribution.
 
 ---
 
@@ -259,13 +281,19 @@ LLM-assisted; no independent human-expert double annotation was performed. The
 expert-panel source papers provide the primary validity anchor, but a full
 human IAA study is needed for a final benchmark release.
 
-**Data contamination.** Claude Haiku (used for the LLM judge and graph-RAG
-classifier) may have been exposed to some FDA/EMA guidance text during
-pretraining. We cannot rule out partial contamination. The lexical baseline and
-NLI results are contamination-free; the LLM judge's 0.819 should be interpreted
-as an upper bound on what a zero-shot LLM achieves on *this distribution*, not
-necessarily on truly novel guidance documents. Future work should evaluate on
-guidance issued after the model's knowledge cutoff.
+**Data contamination.** Claude Haiku may have been exposed to FDA/EMA guidance and
+the published expert-panel comparison papers during pretraining. We cannot rule out
+partial contamination. To probe this, we split performance by source: on the 42
+*primary guidance pairs* (low contamination risk — hand-crafted from guidance text
+not reproduced verbatim) Haiku achieves AGREE F1 = 0.941 and DIVERGE F1 = 0.968;
+on the 59 *expert-comparison pairs* (higher risk — sourced from published papers
+the model may have seen) AGREE F1 = 0.769 and DIVERGE F1 = 0.745. Performance is
+*not* higher on the potentially-contaminated split — if contamination were a major
+driver, the pattern would be reversed. The macro-F1 gap (0.636 vs 0.765) is fully
+explained by SILENT support (n = 2 on primary vs n = 21 on expert pairs), not by
+memorization. This is reassuring but not conclusive; the lexical and NLI results
+remain fully contamination-free. Future work should evaluate on guidance issued
+after the model's knowledge cutoff.
 
 **SILENT operationalization.** Our SILENT pairs use a placeholder ("Not addressed
 in the guidance") on the absent side, which may not reflect real retrieval
