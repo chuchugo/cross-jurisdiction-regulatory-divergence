@@ -45,6 +45,7 @@
 
 \author{Zhiyin Zhou}
 \email{zzhou20@pratt.edu}
+\orcid{0009-0004-5139-4668}
 \affiliation{%
   \institution{Pratt Institute}
   \city{New York}
@@ -54,9 +55,20 @@
 
 \author{Jingzhuo Hu}
 \email{jingzhuoh00@gmail.com}
+\orcid{0009-0008-0206-8531}
 \affiliation{%
   \institution{University of Pennsylvania}
   \city{Philadelphia}
+  \state{PA}
+  \country{USA}
+}
+
+\author{Liang You}
+\email{liy121@pitt.edu}
+\orcid{0009-0002-8773-0614}
+\affiliation{%
+  \institution{University of Pittsburgh}
+  \city{Pittsburgh}
   \state{PA}
   \country{USA}
 }
@@ -78,9 +90,10 @@ is performed manually by regulatory-affairs experts. We introduce
 requirement and an EMA requirement on the same topic, classify their
 relationship as AGREE, DIVERGE, or SILENT. We release
 \textbf{RegDivergence-101}, a 101-pair expert-grounded benchmark (labels
-sourced from three peer-reviewed FDA/EMA comparison studies; inter-annotator
+grounded in three peer-reviewed FDA/EMA comparison studies and primary
+FDA/EMA/ICH guidance text; inter-annotator
 $\kappa = 0.54$), and systematically
-characterize a four-method baseline hierarchy: lexical heuristic (0.549
+characterize a four-method baseline hierarchy: lexical heuristic (0.556
 macro-F1, 95\% CI [0.458--0.650]), NLI cross-encoder (0.271),
 obligation-level Graph-RAG (0.698 [0.602--0.783]), and flat LLM judge /
 Claude Haiku (0.819 [0.736--0.900]). Three findings emerge: SILENT is
@@ -158,9 +171,10 @@ This paper makes three contributions:
 \item \textbf{Task formulation.} Cross-jurisdiction regulatory divergence
   detection as a three-way classification (AGREE / DIVERGE / SILENT) over
   aligned FDA/EMA requirement pairs, grounded in published expert comparisons.
-\item \textbf{Benchmark.} \textbf{RegDivergence-101}, 101 expert-sourced
-  pairs across three therapeutic domains with inter-annotator agreement
-  ($\kappa = 0.54$) and bootstrap confidence intervals.
+\item \textbf{Benchmark.} \textbf{RegDivergence-101}, 101 expert-grounded
+  pairs (59 from peer-reviewed FDA/EMA comparison studies, 42 derived from
+  primary FDA/EMA/ICH guidance) spanning 13 topic areas, with inter-annotator
+  agreement ($\kappa = 0.54$) and bootstrap confidence intervals.
 \item \textbf{Baseline hierarchy with three findings.} Four methods
   systematically compared, yielding empirical insights on the task's structure
   and the path to a corpus-level solution.
@@ -177,9 +191,9 @@ especially under ``negation by exception.'' DocNLI~\cite{yin2021docnli} extended
 NLI to full documents.
 
 \textbf{Legal contradiction detection (2025--2026).}
-LegalWiz~\cite{legalwiz2025} uses a multi-agent framework for legal
+LegalWiz~\cite{legalwiz2025} uses a multi-agent generation framework for legal
 contradiction detection but is confined to single-document regimes. Better Call
-CLAUSE~\cite{betterclause2026} (EACL 2026 Findings) benchmarks 7,500+
+CLAUSE~\cite{betterclause2026} benchmarks 7,500+
 perturbed contracts across ten anomaly categories and finds that LLMs miss
 subtle errors and struggle to \textit{justify} them legally. Contradiction
 Detection in RAG Systems~\cite{contradictionrag2025} uses LLMs as context
@@ -254,12 +268,15 @@ camera-ready benchmark release.
 \section{Baselines}
 %% -------------------------------------------------------------------------
 
-We evaluate four methods under a common evaluation protocol:
-\textbf{stratified nested 5-fold cross-validation} (inner folds tune any
-hyperparameters, outer folds report, averaged over 5 random seeds) with
-\textbf{bootstrap 95\% CI} (1,000 resamples). The LLM judge and Graph-RAG
-classifier have no tunable hyperparameters and are evaluated directly; their
-CIs are bootstrap-only.
+We evaluate four methods under a shared reporting framework:
+\textbf{stratified 5-fold splits} averaged over 5 random seeds, with
+\textbf{bootstrap 95\% CI} (1{,}000 resamples). However, the protocol differs by
+method class. The lexical heuristic and NLI cross-encoder have tunable
+thresholds and use \textbf{nested} CV (inner folds tune thresholds, outer folds
+report). The Graph-RAG classifier and LLM judge have no tunable
+hyperparameters: the Graph-RAG classifier is reported over the same outer
+folds, and the LLM judge is scored directly on all 101 pairs. CIs for both LLM
+methods are bootstrap-only.
 
 \subsection{Lexical Heuristic}
 
@@ -346,15 +363,19 @@ bootstrap 95\% confidence intervals for all four methods.
   101 pairs.}
 \end{table*}
 
-CIs do not overlap between lexical and Graph-RAG, or between Graph-RAG and LLM
-judge---the gaps are statistically reliable at $n = 101$.
+Point estimates increase monotonically from lexical to Graph-RAG to the LLM
+judge. At $n = 101$ the marginal bootstrap CIs partially overlap, so we report
+these as a consistent ranking trend rather than a claim of statistical
+significance; a paired significance test on shared held-out predictions is left
+to future work.
 
 %% -------------------------------------------------------------------------
 \section{Error Analysis: The Lexical Ceiling}
 %% -------------------------------------------------------------------------
 
-The seven residual lexical errors share a signature: \textbf{high lexical
-overlap, opposed regulatory stance.}
+The lexical heuristic misclassifies roughly 42 of the 101 pairs
+(accuracy 0.586). The illustrative errors below share a signature:
+\textbf{high lexical overlap, opposed regulatory stance.}
 
 \begin{itemize}
 \item \textbf{adaptive-01 (DIVERGE $\to$ missed):} FDA ``does \textit{not
