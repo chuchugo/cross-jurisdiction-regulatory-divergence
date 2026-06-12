@@ -1,6 +1,8 @@
-# Detecting Regulatory Divergence Across Jurisdictions: A Cross-Corpus Contradiction Task and Baseline Hierarchy
+# RegDivergence-101: An LLM Benchmark for Cross-Jurisdiction Regulatory Contradiction Detection in Life Sciences
 
-**Target venues:** GACLM 2026 (GenAI in Healthcare track) · EMNLP 2026
+**Authors:** Chuchu Wu, chuchuwu@outlook.com · Zhiyin Zhou, zzhouwork347@gmail.com
+
+**Target venues:** AIFM 2026 (2nd Intl. Conf. on Artificial Intelligence and Foundation Model) · EMNLP 2026
 
 ---
 
@@ -15,7 +17,7 @@ must infer obligations. Today this reconciliation is performed manually by
 regulatory-affairs experts. We introduce **cross-jurisdiction regulatory
 divergence detection**: given an FDA requirement and an EMA requirement on the
 same topic, classify their relationship as AGREE, DIVERGE, or SILENT. We release
-a 101-pair expert-grounded benchmark (labels sourced from three peer-reviewed
+**RegDivergence-101**, a 101-pair expert-grounded benchmark (labels sourced from three peer-reviewed
 FDA/EMA comparison studies; inter-annotator κ = 0.54) and systematically
 characterize a four-method baseline hierarchy: lexical heuristic (0.549 macro-F1,
 95% CI [0.458–0.650]), NLI cross-encoder (0.271), obligation-level graph-RAG
@@ -41,8 +43,8 @@ can lose a year or more re-running a study.
 
 Reconciling the two corpora is currently a manual, expert task. Yet the NLP
 building blocks for automating it all exist — document-level NLI (ContractNLI,
-DocNLI), legal contradiction detection (LegalWiz, CLAUSE), and Graph-RAG
-(Microsoft GraphRAG, GraphCompliance, RAGulating Compliance). **No prior work
+DocNLI)^[1][2], legal contradiction detection (LegalWiz, CLAUSE)^[3][4], and Graph-RAG
+(Microsoft GraphRAG, GraphCompliance, RAGulating Compliance)^[6][7][8]. **No prior work
 combines them to detect divergence between two parallel regulatory corpora from
 different jurisdictions.** All existing contradiction work is *intra-document*
 (within one contract) or *single-jurisdiction* (contract-vs-statute).
@@ -52,7 +54,7 @@ This paper makes three contributions:
 1. **Task formulation.** Cross-jurisdiction regulatory divergence detection as a
    three-way classification (AGREE / DIVERGE / SILENT) over aligned FDA/EMA
    requirement pairs, grounded in published expert comparisons.
-2. **Benchmark.** 101 expert-sourced pairs across three therapeutic domains with
+2. **Benchmark.** **RegDivergence-101**, 101 expert-sourced pairs across three therapeutic domains with
    inter-annotator agreement (κ = 0.54) and bootstrap confidence intervals.
 3. **Baseline hierarchy with three findings.** Four methods systematically
    compared, yielding empirical insights on the task's structure and the path
@@ -62,23 +64,30 @@ This paper makes three contributions:
 
 ## 2. Related Work
 
-**Document-level NLI.** ContractNLI (Koreeda & Manning, EMNLP Findings 2021)
+**Document-level NLI.** ContractNLI (Koreeda & Manning, EMNLP Findings 2021)^[1]
 introduced document-level entailment/contradiction/not-mentioned classification
 with evidence extraction, and showed that contradiction detection lags entailment,
-especially under "negation by exception." DocNLI extended NLI to full documents.
+especially under "negation by exception." DocNLI^[2] extended NLI to full documents.
 
-**Legal contradiction detection (2025–2026).** LegalWiz (arXiv 2510.03418) uses a
+**Legal contradiction detection (2025–2026).** LegalWiz^[3] uses a
 multi-agent framework for legal contradiction detection but is confined to single
-document regimes. Better Call CLAUSE (arXiv 2511.00340, EACL 2026 Findings)
+document regimes. Better Call CLAUSE^[4] (EACL 2026 Findings)
 benchmarks 7,500+ perturbed contracts across ten anomaly categories and finds that
 LLMs miss subtle errors and struggle to *justify* them legally. Contradiction
-Detection in RAG Systems (arXiv 2504.00180) uses LLMs as context validators.
+Detection in RAG Systems^[5] uses LLMs as context validators.
+Two recent RAG-faithfulness studies bear directly on our LLM-judge and graph-RAG
+results: *Does RAG Know When Retrieval Is Wrong?*^[14] probes whether a
+RAG system can recognize when retrieved context is incorrect, and *Relevant Is Not
+Warranted: Evidence-Force Calibration for Cited RAG*^[15] shows that the
+surface relevance of retrieved evidence does not guarantee it *warrants* a claim — the
+same failure mode behind our Finding 2, where modal-register similarity (RECOMMENDED vs
+MANDATORY) misleads the pair-level graph.
 
-**Graph-RAG and regulatory compliance.** Microsoft GraphRAG (2024) builds entity
-graphs with community summaries for local and global queries. GraphCompliance
-(arXiv 2510.26309) aligns *policy graphs* (regulatory requirements) with *context
+**Graph-RAG and regulatory compliance.** Microsoft GraphRAG^[6] builds entity
+graphs with community summaries for local and global queries. GraphCompliance^[8]
+aligns *policy graphs* (regulatory requirements) with *context
 graphs* (organizational facts) for GDPR; it explicitly lists "handling conflicting
-regulatory interpretations" as open. RAGulating Compliance (arXiv 2508.09893)
+regulatory interpretations" as open. RAGulating Compliance^[7]
 builds an ontology-free regulatory knowledge graph for traceable QA.
 
 **Gap.** Contradiction detection is intra-document or single-jurisdiction;
@@ -104,10 +113,10 @@ corresponding EMA statement. The label *y_t* is:
 
 We seed pairs from documented FDA/EMA divergences in three open-access
 expert-panel reviews: a *J. Crohn's & Colitis* 2025 expert comparison of FDA and
-EMA ulcerative colitis guidance (40 pairs), a PMC study comparing EMA and FDA
-psychiatric drug-trial guidelines (10 pairs, PMC8157504), and a PMC comparison of
-US and EU radiopharmaceutical nonclinical requirements (9 pairs, PMC6529498);
-supplemented by 42 pairs derived from primary guidance text (ICH E9(R1), E11A;
+EMA ulcerative colitis guidance (40 pairs)^[9], a PMC study comparing EMA and FDA
+psychiatric drug-trial guidelines (10 pairs)^[11], and a PMC comparison of
+US and EU radiopharmaceutical nonclinical requirements (9 pairs)^[12];
+supplemented by 42 pairs derived from primary guidance text (ICH E9(R1), E11A^[10];
 FDA and EMA guidance). Each pair records `{id, topic, source, fda_text, ema_text,
 label}`. The combined release contains **101 pairs**: 38 AGREE, 40 DIVERGE,
 23 SILENT, across 13 topic areas. We report macro-F1 to weight all classes equally.
@@ -116,7 +125,7 @@ label}`. The combined release contains **101 pairs**: 38 AGREE, 40 DIVERGE,
 independent annotator (Claude Haiku with a deliberately different prompt and no
 access to the original labels) re-labeled a stratified sample of 36 pairs (12 per
 class). Observed agreement: 0.694; Cohen's κ = **0.542** (moderate, Landis & Koch
-1977). AGREE was the most reliable class (83% agreement); SILENT the hardest
+1977)^[13]. AGREE was the most reliable class (83% agreement); SILENT the hardest
 (58%, mainly confused with DIVERGE). We disclose that both annotation passes are
 LLM-assisted; the expert-panel source papers provide the citable human-expert
 anchor. The moderate κ is below the conventional 0.60 threshold and reflects
@@ -179,6 +188,11 @@ Claude Haiku with explicit AGREE / DIVERGE / SILENT definitions, prompted once
 per pair with both texts. No graph, no retrieval. Full prompt in Appendix A.
 
 ### 4.5 Results
+
+Table 1 reports macro-F1, accuracy, and per-class F1 with bootstrap 95% confidence
+intervals for all four methods.
+
+Table 1. Macro-F1, accuracy, and per-class F1 with bootstrap 95% confidence intervals for the four baselines (n = 101 pairs).
 
 | Method | Macro-F1 [95% CI] | Acc | AGREE F1 [CI] | DIVERGE F1 [CI] | SILENT F1 [CI] |
 |--------|-------------------|-----|---------------|-----------------|----------------|
@@ -304,8 +318,8 @@ SILENT task is a proxy; §7 describes the correct corpus-level formulation.
 
 ## 9. Conclusion
 
-We introduced cross-jurisdiction regulatory divergence detection, released a
-101-pair expert-grounded benchmark (κ = 0.54), and characterized a four-method
+We introduced cross-jurisdiction regulatory divergence detection, released
+**RegDivergence-101**, a 101-pair expert-grounded benchmark (κ = 0.54), and characterized a four-method
 baseline hierarchy with bootstrap CIs. Three empirical findings: SILENT requires
 explicit absence-aware formulation (NLI F1 0.08 → LLM F1 0.74); obligation-level
 graph structure improves over lexical heuristics (+0.14 F1) but loses to flat LLM
@@ -352,16 +366,18 @@ Results cached; each pair scored exactly once.
 
 ## References
 
-1. Koreeda & Manning. ContractNLI. EMNLP Findings 2021.
-2. DocNLI: Document-level Natural Language Inference.
-3. LegalWiz. arXiv:2510.03418.
-4. Better Call CLAUSE. arXiv:2511.00340 (EACL 2026 Findings).
-5. Contradiction Detection in RAG Systems. arXiv:2504.00180.
-6. Microsoft GraphRAG. Microsoft Research, 2024.
-7. RAGulating Compliance. arXiv:2508.09893.
-8. GraphCompliance. arXiv:2510.26309.
-9. Comparison of FDA and EMA guidance in ulcerative colitis. J. Crohn's & Colitis 2025.
-10. ICH E11A Pediatric Extrapolation. FDA guidance.
-11. EMA and FDA psychiatric drug trial guidelines. PMC8157504.
-12. US/EU radiopharmaceutical nonclinical requirements. PMC6529498.
-13. Landis & Koch. The measurement of observer agreement. Biometrics, 1977.
+1. Koreeda, Y., & Manning, C. D. 2021. ContractNLI: A Dataset for Document-level Natural Language Inference for Contracts. In Findings of EMNLP 2021.
+2. Yin, W., Radev, D., & Xiong, C. 2021. DocNLI: A Large-scale Dataset for Document-level Natural Language Inference. In Findings of ACL 2021.
+3. LegalWiz: A Multi-Agent Framework for Legal Contradiction Detection. 2025. arXiv:2510.03418.
+4. Better Call CLAUSE: Benchmarking Contractual Anomaly Detection. 2026. arXiv:2511.00340 (EACL 2026 Findings).
+5. Contradiction Detection in RAG Systems: LLMs as Context Validators. 2025. arXiv:2504.00180.
+6. Edge, D., Trinh, H., Cheng, N., et al. 2024. From Local to Global: A GraphRAG Approach to Query-Focused Summarization. Microsoft Research. arXiv:2404.16130.
+7. RAGulating Compliance: An Ontology-Free Regulatory Knowledge Graph for Traceable QA. 2025. arXiv:2508.09893.
+8. GraphCompliance: Aligning Policy and Context Graphs for GDPR Compliance. 2025. arXiv:2510.26309.
+9. Expert Comparison of FDA and EMA Guidance for Ulcerative Colitis Trials. 2025. Journal of Crohn's and Colitis 19, 1.
+10. ICH E11A Guideline on Pediatric Extrapolation. 2024. International Council for Harmonisation / FDA Guidance.
+11. Comparison of EMA and FDA Guidelines for Psychiatric Drug Trials. 2021. PMC8157504.
+12. Comparison of US and EU Nonclinical Requirements for Radiopharmaceuticals. 2019. PMC6529498.
+13. Landis, J. R., & Koch, G. G. 1977. The Measurement of Observer Agreement for Categorical Data. Biometrics 33, 1, 159–174.
+14. Chen, Y., Qian, P., Wang, S., Zhang, S., Xu, H., Lin, S., & Wei, X. Does RAG Know When Retrieval Is Wrong? arXiv:2605.14473, 2026.
+15. Qian, P., Wang, S., Wang, X., Chen, Y., Xu, W., Yu, Q., Lin, S., Zhang, S., You, J., & Wei, X. Relevant Is Not Warranted: Evidence-Force Calibration for Cited RAG. arXiv:2605.28044, 2026.
