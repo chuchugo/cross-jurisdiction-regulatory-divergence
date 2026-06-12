@@ -70,8 +70,8 @@ with evidence extraction, and showed that contradiction detection lags entailmen
 especially under "negation by exception." DocNLI^[2] extended NLI to full documents.
 
 **Legal contradiction detection (2025–2026).** LegalWiz^[3] uses a
-multi-agent framework for legal contradiction detection but is confined to single
-document regimes. Better Call CLAUSE^[4] (EACL 2026 Findings)
+multi-agent generation framework for legal contradiction detection but is confined
+to single document regimes. Better Call CLAUSE^[4]
 benchmarks 7,500+ perturbed contracts across ten anomaly categories and finds that
 LLMs miss subtle errors and struggle to *justify* them legally. Contradiction
 Detection in RAG Systems^[5] uses LLMs as context validators.
@@ -368,16 +368,16 @@ Results cached; each pair scored exactly once.
 
 1. Koreeda, Y., & Manning, C. D. 2021. ContractNLI: A Dataset for Document-level Natural Language Inference for Contracts. In Findings of EMNLP 2021.
 2. Yin, W., Radev, D., & Xiong, C. 2021. DocNLI: A Large-scale Dataset for Document-level Natural Language Inference. In Findings of ACL 2021.
-3. LegalWiz: A Multi-Agent Framework for Legal Contradiction Detection. 2025. arXiv:2510.03418.
-4. Better Call CLAUSE: Benchmarking Contractual Anomaly Detection. 2026. arXiv:2511.00340 (EACL 2026 Findings).
-5. Contradiction Detection in RAG Systems: LLMs as Context Validators. 2025. arXiv:2504.00180.
+3. Mantravadi, A., Dalmia, S., Pospelova, O., Mukherji, A., Dave, N., & Mittal, A. 2025. LegalWiz: A Multi-Agent Generation Framework for Contradiction Detection in Legal Documents. arXiv:2510.03418.
+4. Choudhury, M. R., Chandramouli, A., Anand, M., & Gupta, V. 2026. Better Call CLAUSE: A Discrepancy Benchmark for Auditing LLMs Legal Reasoning Capabilities. arXiv:2511.00340.
+5. Gokul, V., Tenneti, S., & Nakkiran, A. 2025. Contradiction Detection in RAG Systems: Evaluating LLMs as Context Validators for Improved Information Consistency. arXiv:2504.00180.
 6. Edge, D., Trinh, H., Cheng, N., et al. 2024. From Local to Global: A GraphRAG Approach to Query-Focused Summarization. Microsoft Research. arXiv:2404.16130.
-7. RAGulating Compliance: An Ontology-Free Regulatory Knowledge Graph for Traceable QA. 2025. arXiv:2508.09893.
-8. GraphCompliance: Aligning Policy and Context Graphs for GDPR Compliance. 2025. arXiv:2510.26309.
-9. Expert Comparison of FDA and EMA Guidance for Ulcerative Colitis Trials. 2025. Journal of Crohn's and Colitis 19, 1.
+7. Agarwal, B., Jomraj, H. S., Kaplunov, S., Krolick, J., & Rojkova, V. 2025. RAGulating Compliance: A Multi-Agent Knowledge Graph for Regulatory QA. arXiv:2508.09893.
+8. Chung, J., Ko, R., Yoo, W., Onizuka, M., Kim, S., Kim, T.-W., & Shin, W.-Y. 2025. GraphCompliance: Aligning Policy and Context Graphs for LLM-Based Regulatory Compliance. arXiv:2510.26309.
+9. Vieujean, S., Sands, B. E., Panaccione, R., Rubin, D. T., Jairath, V., Danese, S., Peyrin-Biroulet, L., Schreiber, S., Vermeire, S., D'Haens, G., Dignass, A., Dulai, P. S., Narula, N., & Reinisch, W. 2025. Comparison of the FDA and EMA guidance on drug development in ulcerative colitis: an expert panel review. Journal of Crohn's and Colitis 19, 7, jjaf111.
 10. ICH E11A Guideline on Pediatric Extrapolation. 2024. International Council for Harmonisation / FDA Guidance.
-11. Comparison of EMA and FDA Guidelines for Psychiatric Drug Trials. 2021. PMC8157504.
-12. Comparison of US and EU Nonclinical Requirements for Radiopharmaceuticals. 2019. PMC6529498.
+11. Boesen, K., Gøtzsche, P. C., & Ioannidis, J. P. A. 2021. EMA and FDA psychiatric drug trial guidelines: assessment of guideline development and trial design recommendations. Epidemiology and Psychiatric Sciences 30, e35.
+12. Schwarz, S. W., & Decristoforo, C. 2019. US and EU radiopharmaceutical diagnostic and therapeutic nonclinical study requirements for clinical trials authorizations and marketing authorizations. EJNMMI Radiopharmacy and Chemistry 4, 1, 10.
 13. Landis, J. R., & Koch, G. G. 1977. The Measurement of Observer Agreement for Categorical Data. Biometrics 33, 1, 159–174.
 14. Chen, Y., Qian, P., Wang, S., Zhang, S., Xu, H., Lin, S., & Wei, X. Does RAG Know When Retrieval Is Wrong? arXiv:2605.14473, 2026.
 15. Qian, P., Wang, S., Wang, X., Chen, Y., Xu, W., Yu, Q., Lin, S., Zhang, S., You, J., & Wei, X. Relevant Is Not Warranted: Evidence-Force Calibration for Cited RAG. arXiv:2605.28044, 2026.
