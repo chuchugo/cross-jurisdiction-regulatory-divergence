@@ -4,10 +4,18 @@
 %% For final camera-ready, use:
 %%   \documentclass[sigconf]{acmart}
 %%
-\documentclass[manuscript, screen, review]{acmart}
+\documentclass[sigconf]{acmart}
 
 \AtBeginDocument{%
   \providecommand\BibTeX{{Bib\TeX}}}
+
+\usepackage{booktabs}
+
+%% Remove the "ACM Reference Format" block from the first page
+\settopmatter{printacmref=false}
+
+%% Render all hyperlinks (citations, URLs, author names) in black
+\hypersetup{hidelinks}
 
 %% Rights — fill in from ACM rights confirmation email after acceptance
 \setcopyright{acmlicensed}
