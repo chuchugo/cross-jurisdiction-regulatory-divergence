@@ -1,8 +1,16 @@
 # RegDivergence-101: An LLM Benchmark for Cross-Jurisdiction Regulatory Contradiction Detection in Life Sciences
 
-**Authors:** Chuchu Wu, chuchuwu@outlook.com · Zhiyin Zhou, zzhouwork347@gmail.com
+**Authors:**
+- Chuchu Wu (corresponding author), Carnegie Mellon University, Pittsburgh, PA, USA — chuchuw@alumni.cmu.edu · ORCID 0009-0006-5140-2247
+- Zhiyin Zhou, Pratt Institute, New York, NY, USA — zzhou20@pratt.edu · ORCID 0009-0004-5139-4668
+- Jingzhuo Hu, University of Pennsylvania, Philadelphia, PA, USA — jingzhuoh00@gmail.com · ORCID 0009-0008-0206-8531
+- Liang You, University of Pittsburgh, Pittsburgh, PA, USA — liy121@pitt.edu · ORCID 0009-0002-8773-0614
 
-**Target venues:** AIFM 2026 (2nd Intl. Conf. on Artificial Intelligence and Foundation Model) · EMNLP 2026
+**Target venue:** AIFM '26 — 2026 2nd International Conference on Artificial Intelligence and Foundation Model, June 26–28, 2026, Urumqi, China.
+
+**CCS Concepts:** Computing methodologies → Natural language processing; Information systems → Document filtering; Applied computing → Health informatics.
+
+**Keywords:** large language models, LLM benchmark, regulatory NLP, AI for compliance, FDA/EMA divergence, contradiction detection, Graph-RAG, retrieval-augmented generation, generative AI, life sciences, AGREE/DIVERGE/SILENT classification
 
 ---
 
@@ -17,15 +25,16 @@ must infer obligations. Today this reconciliation is performed manually by
 regulatory-affairs experts. We introduce **cross-jurisdiction regulatory
 divergence detection**: given an FDA requirement and an EMA requirement on the
 same topic, classify their relationship as AGREE, DIVERGE, or SILENT. We release
-**RegDivergence-101**, a 101-pair expert-grounded benchmark (labels sourced from three peer-reviewed
-FDA/EMA comparison studies; inter-annotator κ = 0.54) and systematically
-characterize a four-method baseline hierarchy: lexical heuristic (0.549 macro-F1,
-95% CI [0.458–0.650]), NLI cross-encoder (0.271), obligation-level graph-RAG
-(0.698 [0.602–0.783]), and flat LLM judge / Claude Haiku (0.819 [0.736–0.900]).
-Three findings emerge: SILENT is semantically detectable but invisible to
-entailment-only formulations; pair-level obligation graphs improve over lexical
-methods but lose to flat-LLM context; and corpus-level graph construction is the
-correct architectural target for large-scale silent-detection.
+**RegDivergence-101**, a 101-pair expert-grounded benchmark (labels grounded in
+three peer-reviewed FDA/EMA comparison studies and primary FDA/EMA/ICH guidance
+text; inter-annotator κ = 0.54) and systematically characterize a four-method
+baseline hierarchy: lexical heuristic (0.556 macro-F1, 95% CI [0.458–0.650]),
+NLI cross-encoder (0.271), obligation-level Graph-RAG (0.698 [0.602–0.783]), and
+flat LLM judge / Claude Haiku (0.819 [0.736–0.900]). Three findings emerge:
+SILENT is semantically detectable but invisible to entailment-only formulations;
+pair-level obligation graphs improve over lexical methods but lose to flat-LLM
+context; and corpus-level graph construction is the correct architectural target
+for large-scale silent-detection.
 
 ---
 
@@ -44,7 +53,7 @@ can lose a year or more re-running a study.
 Reconciling the two corpora is currently a manual, expert task. Yet the NLP
 building blocks for automating it all exist — document-level NLI (ContractNLI,
 DocNLI)^[1][2], legal contradiction detection (LegalWiz, CLAUSE)^[3][4], and Graph-RAG
-(Microsoft GraphRAG, GraphCompliance, RAGulating Compliance)^[6][7][8]. **No prior work
+(Microsoft GraphRAG, GraphCompliance, RAGulating Compliance)^[6][8][7]. **No prior work
 combines them to detect divergence between two parallel regulatory corpora from
 different jurisdictions.** All existing contradiction work is *intra-document*
 (within one contract) or *single-jurisdiction* (contract-vs-statute).
@@ -54,8 +63,10 @@ This paper makes three contributions:
 1. **Task formulation.** Cross-jurisdiction regulatory divergence detection as a
    three-way classification (AGREE / DIVERGE / SILENT) over aligned FDA/EMA
    requirement pairs, grounded in published expert comparisons.
-2. **Benchmark.** **RegDivergence-101**, 101 expert-sourced pairs across three therapeutic domains with
-   inter-annotator agreement (κ = 0.54) and bootstrap confidence intervals.
+2. **Benchmark.** **RegDivergence-101**, 101 expert-grounded pairs (59 from
+   peer-reviewed FDA/EMA comparison studies, 42 derived from primary FDA/EMA/ICH
+   guidance) spanning 13 topic areas, with inter-annotator agreement (κ = 0.54)
+   and bootstrap confidence intervals.
 3. **Baseline hierarchy with three findings.** Four methods systematically
    compared, yielding empirical insights on the task's structure and the path
    to a corpus-level solution.
@@ -71,7 +82,7 @@ especially under "negation by exception." DocNLI^[2] extended NLI to full docume
 
 **Legal contradiction detection (2025–2026).** LegalWiz^[3] uses a
 multi-agent generation framework for legal contradiction detection but is confined
-to single document regimes. Better Call CLAUSE^[4]
+to single-document regimes. Better Call CLAUSE^[4]
 benchmarks 7,500+ perturbed contracts across ten anomaly categories and finds that
 LLMs miss subtle errors and struggle to *justify* them legally. Contradiction
 Detection in RAG Systems^[5] uses LLMs as context validators.
@@ -129,23 +140,24 @@ class). Observed agreement: 0.694; Cohen's κ = **0.542** (moderate, Landis & Ko
 (58%, mainly confused with DIVERGE). We disclose that both annotation passes are
 LLM-assisted; the expert-panel source papers provide the citable human-expert
 anchor. The moderate κ is below the conventional 0.60 threshold and reflects
-genuine task difficulty — SILENT requires determining absence of regulation, which
-is inherently more ambiguous than detecting presence of conflict. This ambiguity is
-independently confirmed by the empirical gap between NLI SILENT F1 (0.079) and LLM
-SILENT F1 (0.743) in §4.5, and by the fact that SILENT is where the pair-level
-graph also struggles most. We treat κ = 0.542 as a characterization of task
-difficulty rather than a quality failure, and recommend that a full human-expert
-IAA study be conducted for the camera-ready benchmark release.
+genuine task difficulty — SILENT requires determining *absence* of regulation, which
+is inherently more ambiguous than detecting presence of conflict. We treat
+κ = 0.542 as a characterization of task difficulty rather than a quality failure,
+and recommend that a full human-expert IAA study be conducted for the camera-ready
+benchmark release.
 
 ---
 
 ## 4. Baselines
 
-We evaluate four methods under a common evaluation protocol: **stratified nested
-5-fold cross-validation** (inner folds tune any hyperparameters, outer folds
-report, averaged over 5 random seeds) with **bootstrap 95% CI** (1,000 resamples).
-The LLM judge and graph-RAG classifier have no tunable hyperparameters and are
-evaluated directly; their CIs are bootstrap-only.
+We evaluate four methods under a shared reporting framework: **stratified 5-fold
+splits** averaged over 5 random seeds, with **bootstrap 95% CI** (1,000 resamples).
+However, the protocol differs by method class. The lexical heuristic and NLI
+cross-encoder have tunable thresholds and use **nested** CV (inner folds tune
+thresholds, outer folds report). The Graph-RAG classifier and LLM judge have no
+tunable hyperparameters: the Graph-RAG classifier is reported over the same outer
+folds, and the LLM judge is scored directly on all 101 pairs. CIs for both LLM
+methods are bootstrap-only.
 
 ### 4.1 Lexical heuristic
 
@@ -160,7 +172,7 @@ number vs case-by-case deferral). A shared ICH citation is a strong AGREE signal
 `typeform/distilbert-base-uncased-mnli`, run in both directions; labels derived
 from contradiction/neutral/entailment probabilities with CV-tuned thresholds. We
 use DistilBERT-MNLI as a representative off-the-shelf NLI system. The structural
-SILENT gap finding (§6, Finding 1) is model-agnostic: any NLI model lacking an
+SILENT gap finding (§7, Finding 1) is model-agnostic: any NLI model lacking an
 explicit SILENT output class will map absence-of-regulation to *neutral*, collapsing
 SILENT recall. Substituting DeBERTa-v3-large or a modern cross-encoder would
 improve AGREE/DIVERGE F1 but would not resolve the SILENT structural gap without
@@ -187,7 +199,9 @@ held-out fold predictions as the other methods.
 Claude Haiku with explicit AGREE / DIVERGE / SILENT definitions, prompted once
 per pair with both texts. No graph, no retrieval. Full prompt in Appendix A.
 
-### 4.5 Results
+---
+
+## 5. Results
 
 Table 1 reports macro-F1, accuracy, and per-class F1 with bootstrap 95% confidence
 intervals for all four methods.
@@ -202,19 +216,22 @@ Table 1. Macro-F1, accuracy, and per-class F1 with bootstrap 95% confidence inte
 | **LLM judge (Haiku)⁴** | **0.819 [0.736–0.900]** | **0.832** | **0.884 [0.800–0.951]** | **0.830 [0.737–0.911]** | **0.743 [0.579–0.878]** |
 
 ¹ Nested 5-fold CV, 5 seeds; thresholds tuned on inner folds only. ² Same CV protocol,
-thresholds tuned on inner folds. ³ No tunable hyperparameters; evaluated on all 101 pairs
-using same outer-fold splits; bootstrap CI only. ⁴ `claude-haiku-4-5-20251001`, default
-temperature; no tunable hyperparameters; bootstrap CI only. Estimated cost: ~$0.10 for all
-101 pairs (cached; each pair scored exactly once).
+thresholds tuned on inner folds. ³ No tunable hyperparameters; bootstrap CI only.
+⁴ `claude-haiku-4-5-20251001`, default temperature; bootstrap CI only. Estimated cost:
+~$0.10 for all 101 pairs.
 
-CIs do not overlap between lexical and graph-RAG, or between graph-RAG and LLM
-judge — the gaps are statistically reliable at n = 101.
+Point estimates increase monotonically from lexical to Graph-RAG to the LLM
+judge. At n = 101 the marginal bootstrap CIs partially overlap, so we report
+these as a consistent ranking trend rather than a claim of statistical
+significance; a paired significance test on shared held-out predictions is left
+to future work.
 
 ---
 
-## 5. Error Analysis: The Lexical Ceiling
+## 6. Error Analysis: The Lexical Ceiling
 
-The seven residual lexical errors share a signature: **high lexical overlap,
+The lexical heuristic misclassifies roughly 42 of the 101 pairs (accuracy 0.586).
+The illustrative errors below share a signature: **high lexical overlap,
 opposed regulatory stance.**
 
 - **adaptive-01 (DIVERGE→missed):** FDA "does *not require* detailed
@@ -230,7 +247,7 @@ requirement asserts about which entity*.
 
 ---
 
-## 6. Discussion: What the Baseline Hierarchy Reveals
+## 7. Discussion: What the Baseline Hierarchy Reveals
 
 **Finding 1 — SILENT is semantically detectable but invisible to NLI framing.**
 SILENT F1 = 0.079 under NLI (no native SILENT class) vs 0.743 under the LLM
@@ -245,7 +262,9 @@ from similar-sounding text. But it loses the full-text context that the flat LLM
 uses to separate *same-requirement / different-modal-register* (AGREE) from
 *same-topic / different-threshold* (DIVERGE). Pairs like gene-01 (FDA 15 years vs
 EMA case-by-case) both extract as RECOMMENDED and the graph calls them AGREE; the
-flat LLM correctly identifies the threshold conflict from the text.
+flat LLM correctly identifies the threshold conflict from the text. This is
+precisely the failure mode identified by Qian et al.^[15]: surface relevance does
+not imply evidential force.
 
 **Finding 3 — Two distinct ceilings for two different problem scopes.** The
 *pair-level ceiling* is the flat LLM judge (0.819): given two aligned sentences
@@ -253,12 +272,12 @@ and explicit definitions, an LLM nearly saturates the task. The *corpus-level
 ceiling* is the domain of the graph method: "is EMA silent on this topic *anywhere*
 across its guideline corpus?" is a query a pairwise LLM cannot make but a
 corpus-level policy graph can. These are different tasks with different upper
-bounds. This paper measures and establishes the pair-level ceiling; §7 motivates
+bounds. This paper measures and establishes the pair-level ceiling; §8 motivates
 the corpus-level architecture as the natural next contribution.
 
 ---
 
-## 7. Future Work: Corpus-Level Policy Graph
+## 8. Future Work: Corpus-Level Policy Graph
 
 The pair-level experiments establish that the correct target for a genuine Graph-RAG
 contribution is **corpus-level** silent detection and divergence discovery — not
@@ -278,17 +297,17 @@ The proposed architecture:
    specialists.
 
 Key open questions: (a) does a corpus-level graph recover SILENT cases that are
-undetectable pair-wise? (b) what is the alignment precision when FDA and EMA use
+undetectable pairwise? (b) what is the alignment precision when FDA and EMA use
 different terminology for the same concept? (c) can the graph be kept current as
 guidance is updated?
 
 ---
 
-## 8. Limitations
+## 9. Limitations
 
 **Benchmark scale.** 101 pairs from three source documents introduces domain skew
-(40/101 from one UC comparison paper) and limits power. The CI widths (~0.09–0.17
-for most methods) reflect this. Results should be treated as directional.
+(40/101 from one UC comparison paper) and limits statistical power. The CI widths
+(~0.09–0.17 for most methods) reflect this. Results should be treated as directional.
 
 **Inter-annotator agreement.** κ = 0.542 is moderate. Both annotation passes are
 LLM-assisted; no independent human-expert double annotation was performed. The
@@ -296,27 +315,23 @@ expert-panel source papers provide the primary validity anchor, but a full
 human IAA study is needed for a final benchmark release.
 
 **Data contamination.** Claude Haiku may have been exposed to FDA/EMA guidance and
-the published expert-panel comparison papers during pretraining. We cannot rule out
-partial contamination. To probe this, we split performance by source: on the 42
-*primary guidance pairs* (low contamination risk — hand-crafted from guidance text
-not reproduced verbatim) Haiku achieves AGREE F1 = 0.941 and DIVERGE F1 = 0.968;
-on the 59 *expert-comparison pairs* (higher risk — sourced from published papers
-the model may have seen) AGREE F1 = 0.769 and DIVERGE F1 = 0.745. Performance is
-*not* higher on the potentially-contaminated split — if contamination were a major
-driver, the pattern would be reversed. The macro-F1 gap (0.636 vs 0.765) is fully
-explained by SILENT support (n = 2 on primary vs n = 21 on expert pairs), not by
-memorization. This is reassuring but not conclusive; the lexical and NLI results
-remain fully contamination-free. Future work should evaluate on guidance issued
+the published expert-panel comparison papers during pretraining. To probe this, we
+split performance by source: on the 42 *primary guidance pairs* (low contamination
+risk) Haiku achieves AGREE F1 = 0.941 and DIVERGE F1 = 0.968; on the 59
+*expert-comparison pairs* (higher risk) AGREE F1 = 0.769 and DIVERGE F1 = 0.745.
+Performance is *not* higher on the potentially-contaminated split. The macro-F1 gap
+(0.636 vs 0.765) is fully explained by SILENT support (n = 2 on primary vs n = 21
+on expert pairs), not memorization. Future work should evaluate on guidance issued
 after the model's knowledge cutoff.
 
-**SILENT operationalization.** Our SILENT pairs use a placeholder ("Not addressed
-in the guidance") on the absent side, which may not reflect real retrieval
-conditions where a system must determine absence from a full corpus. The pair-level
-SILENT task is a proxy; §7 describes the correct corpus-level formulation.
+**SILENT operationalization.** Our SILENT pairs use a placeholder on the absent
+side, which may not reflect real retrieval conditions where a system must determine
+absence from a full corpus. The pair-level SILENT task is a proxy; §8 describes the
+correct corpus-level formulation.
 
 ---
 
-## 9. Conclusion
+## 10. Conclusion
 
 We introduced cross-jurisdiction regulatory divergence detection, released
 **RegDivergence-101**, a 101-pair expert-grounded benchmark (κ = 0.54), and characterized a four-method
@@ -326,7 +341,16 @@ graph structure improves over lexical heuristics (+0.14 F1) but loses to flat LL
 context (−0.12 F1); and the graph method's correct target is corpus-level
 construction, where it uniquely enables silence discovery at scale. The flat LLM
 judge (0.819) is the pair-level ceiling; beating it requires the corpus-level
-architecture proposed in §7.
+architecture proposed in §8.
+
+---
+
+## Acknowledgments
+
+This work was conducted independently. Benchmark pairs were derived from publicly
+available FDA/EMA guidance documents and open-access peer-reviewed comparison
+studies. LLM API calls used the Anthropic API (Claude Haiku,
+`claude-haiku-4-5-20251001`).
 
 ---
 
@@ -368,16 +392,16 @@ Results cached; each pair scored exactly once.
 
 1. Koreeda, Y., & Manning, C. D. 2021. ContractNLI: A Dataset for Document-level Natural Language Inference for Contracts. In Findings of EMNLP 2021.
 2. Yin, W., Radev, D., & Xiong, C. 2021. DocNLI: A Large-scale Dataset for Document-level Natural Language Inference. In Findings of ACL 2021.
-3. Mantravadi, A., Dalmia, S., Pospelova, O., Mukherji, A., Dave, N., & Mittal, A. 2025. LegalWiz: A Multi-Agent Generation Framework for Contradiction Detection in Legal Documents. arXiv:2510.03418.
-4. Choudhury, M. R., Chandramouli, A., Anand, M., & Gupta, V. 2026. Better Call CLAUSE: A Discrepancy Benchmark for Auditing LLMs Legal Reasoning Capabilities. arXiv:2511.00340.
+3. Mantravadi, A., Dalmia, S., Mukherji, A., Dave, N., Mittal, A., & Pospelova, O. 2025. LegalWiz: A Multi-Agent Generation Framework for Contradiction Detection in Legal Documents. NeurIPS 2025 Workshop. arXiv:2510.03418.
+4. Choudhury, M. R., Chandramouli, A., Anand, M., & Gupta, V. 2026. Better Call CLAUSE: A Discrepancy Benchmark for Auditing LLMs' Legal Reasoning Capabilities. In Findings of EACL 2026. arXiv:2511.00340.
 5. Gokul, V., Tenneti, S., & Nakkiran, A. 2025. Contradiction Detection in RAG Systems: Evaluating LLMs as Context Validators for Improved Information Consistency. arXiv:2504.00180.
-6. Edge, D., Trinh, H., Cheng, N., et al. 2024. From Local to Global: A GraphRAG Approach to Query-Focused Summarization. Microsoft Research. arXiv:2404.16130.
+6. Edge, D., Trinh, H., Cheng, N., Bradley, J., Chao, A., Mody, A., Truitt, S., & Larson, J. 2024. From Local to Global: A GraphRAG Approach to Query-Focused Summarization. arXiv:2404.16130.
 7. Agarwal, B., Jomraj, H. S., Kaplunov, S., Krolick, J., & Rojkova, V. 2025. RAGulating Compliance: A Multi-Agent Knowledge Graph for Regulatory QA. arXiv:2508.09893.
 8. Chung, J., Ko, R., Yoo, W., Onizuka, M., Kim, S., Kim, T.-W., & Shin, W.-Y. 2025. GraphCompliance: Aligning Policy and Context Graphs for LLM-Based Regulatory Compliance. arXiv:2510.26309.
 9. Vieujean, S., Sands, B. E., Panaccione, R., Rubin, D. T., Jairath, V., Danese, S., Peyrin-Biroulet, L., Schreiber, S., Vermeire, S., D'Haens, G., Dignass, A., Dulai, P. S., Narula, N., & Reinisch, W. 2025. Comparison of the FDA and EMA guidance on drug development in ulcerative colitis: an expert panel review. Journal of Crohn's and Colitis 19, 7, jjaf111.
-10. ICH E11A Guideline on Pediatric Extrapolation. 2024. International Council for Harmonisation / FDA Guidance.
+10. International Council for Harmonisation. 2024. ICH E11A Guideline on Pediatric Extrapolation. FDA / EMA.
 11. Boesen, K., Gøtzsche, P. C., & Ioannidis, J. P. A. 2021. EMA and FDA psychiatric drug trial guidelines: assessment of guideline development and trial design recommendations. Epidemiology and Psychiatric Sciences 30, e35.
-12. Schwarz, S. W., & Decristoforo, C. 2019. US and EU radiopharmaceutical diagnostic and therapeutic nonclinical study requirements for clinical trials authorizations and marketing authorizations. EJNMMI Radiopharmacy and Chemistry 4, 1, 10.
+12. Schwarz, S. W., & Decristoforo, C. 2019. US and EU radiopharmaceutical diagnostic and therapeutic nonclinical study requirements for clinical trials authorizations and marketing authorizations. EJNMMI Radiopharmacy and Chemistry 4, 1, 9.
 13. Landis, J. R., & Koch, G. G. 1977. The Measurement of Observer Agreement for Categorical Data. Biometrics 33, 1, 159–174.
-14. Chen, Y., Qian, P., Wang, S., Zhang, S., Xu, H., Lin, S., & Wei, X. Does RAG Know When Retrieval Is Wrong? arXiv:2605.14473, 2026.
-15. Qian, P., Wang, S., Wang, X., Chen, Y., Xu, W., Yu, Q., Lin, S., Zhang, S., You, J., & Wei, X. Relevant Is Not Warranted: Evidence-Force Calibration for Cited RAG. arXiv:2605.28044, 2026.
+14. Chen, Y., Qian, P., Wang, S., Zhang, S., Xu, H., Lin, S., & Wei, X. 2026. Does RAG Know When Retrieval Is Wrong? arXiv:2605.14473.
+15. Qian, P., Wang, S., Wang, X., Chen, Y., Xu, W., Yu, Q., Lin, S., Zhang, S., You, J., & Wei, X. 2026. Relevant Is Not Warranted: Evidence-Force Calibration for Cited RAG. arXiv:2605.28044.
