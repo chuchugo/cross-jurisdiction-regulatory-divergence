@@ -21,6 +21,14 @@
   \geometry{top=3.1cm, bottom=5.01cm, left=2.54cm, right=3.6cm,
             letterpaper}%
 }
+%% Override acmart manuscript's 1.5× line spacing.
+%% \setstretch (setspace) updates the internal linespread factor so that
+%% \normalsize re-applications keep single spacing.  We then sync acmart's
+%% guard (\ACM@origbaselinestretch) to the new value so AtEndDocument passes.
+\setstretch{1.0}
+\makeatletter
+\let\ACM@origbaselinestretch\baselinestretch
+\makeatother
 
 %% ── Heading font overrides (Chinese size conventions) ───────────────────────
 %% 小四 (xiǎo sì)  = 12 pt  → paper title
@@ -64,7 +72,6 @@
 %%\acmSubmissionID{XXX-XXXX}
 
 \begin{document}
-\singlespacing  %% override acmart manuscript's default 1.5× leading
 
 %%
 %% Title. Use \title[short title]{full title} when the full title is long.
@@ -196,20 +203,13 @@ unrepresented regulatory domains and an expansion roadmap are described in
 %% -------------------------------------------------------------------------
 
 Bringing a medicine to market in both the US and EU requires satisfying two
-regulators that publish guidance separately and, frequently,
-\textit{differently}. A concrete example: gene-therapy sponsors face a 15-year
-long-term follow-up recommendation from FDA, while EMA defers the duration to
-case-by-case risk assessment---same topic, materially different specificity.
-Another documented divergence concerns ICH E9(R1) \textbf{estimand} implementation
-for oncology: although FDA, EMA, and PMDA jointly authored the ICH E9(R1) framework,
-\textit{indication-specific implementation guidance} has diverged---for
-progression-free survival, EMA practice has defaulted to a treatment-policy
-strategy, whereas FDA cancer-endpoint guidance has applied censoring for
-intercurrent events such as subsequent anticancer therapy~\cite{siegel2024oncology}.
-Other documented divergences span pediatric extrapolation (ICH E11A), endpoint
-definitions in ulcerative colitis, and the regulatory pathway for companion
-diagnostics. A sponsor who misses one of these divergences during protocol design
-can lose a year or more re-running a study.
+regulators that publish guidance separately and frequently \textit{differently}.
+Gene-therapy sponsors face a 15-year long-term follow-up recommendation from FDA
+while EMA defers the duration to case-by-case risk assessment---same topic,
+materially different specificity. Analogous divergences span pediatric
+extrapolation, endpoint definitions in ulcerative colitis, biosimilar
+comparability, and estimand implementation. A sponsor who misses one divergence
+during protocol design can lose a year or more re-running a study.
 
 Reconciling the two corpora is currently a manual, expert task. Yet the NLP
 building blocks for automating it all exist---document-level NLI
@@ -465,40 +465,10 @@ epistemically soft. The HIGH/MODERATE audit is deferred to RegDivergence-500.
 \label{sec:eval_context}
 
 RegDivergence-101 is an \textbf{evaluation benchmark}, not a training dataset.
-All four baselines are zero-shot or few-shot: the LLM judge uses no labelled
-pairs during inference; the NLI cross-encoder is DistilBERT-MNLI fine-tuned on
-MultiNLI, not on our data; the Graph-RAG and lexical baselines require no
-supervised training on our pairs. The relevant comparator is therefore
-specialised NLI evaluation benchmarks, not large training corpora:
-
-\begin{table}[h]
-  \caption{RegDivergence-101 in context of other specialised NLI evaluation
-    benchmarks.}
-  \label{tab:benchmark_comparison}
-  \small
-  \begin{tabular}{lll}
-    \toprule
-    Benchmark & Task domain & Dev/Test pairs \\
-    \midrule
-    MedNLI & Clinical NLI & 1,422 \\
-    WinoGrande & Commonsense reasoning & 1,267 \\
-    CommonsenseQA & Commonsense QA & 1,221 \\
-    ContractNLI & Legal NLI & $\sim$1,100 \\
-    BioASQ (contradiction) & Biomedical NLI & $\sim$600 \\
-    \textbf{RegDivergence-101} & \textbf{Regulatory divergence} & \textbf{101} \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-\textbf{Statistical adequacy.} With $n = 101$ and a 1{,}000-resample bootstrap,
-macro-F1 95\% CI half-widths are $\approx \pm 0.08$--$0.10$. Adjacent methods in
-Table~\ref{tab:results} are separated by $\Delta = 0.15$--$0.60$ macro-F1
-(minimum separation: Graph-RAG vs.\ LLM judge, $\Delta = 0.167$, CIs partially
-overlapping), sufficient to establish the ranking order
-reported in \S\ref{sec:results} as a trend though not pairwise significance.
-We report these as a consistent ranking trend
-rather than a claim of statistical significance; a paired significance test on
-shared held-out predictions is left to future work.
+All four baselines are zero-shot or few-shot. Adjacent methods are separated by
+$\Delta = 0.15$--$0.60$ macro-F1 (min: Graph-RAG vs.\ LLM, $\Delta = 0.167$;
+CIs partially overlapping); bootstrap CI half-widths $\approx \pm 0.08$--$0.10$
+at $n = 101$. Results are reported as a ranking trend, not pairwise significance.
 
 \subsection{Shared Evaluation Protocol}
 
@@ -545,13 +515,6 @@ pairs are escalated to a second LLM call that reasons over the
 calibration that modal-register differences (RECOMMENDED vs.\ MANDATORY) do not
 automatically imply DIVERGE.
 
-\textbf{Evaluation note.} The graph classifier was evaluated on the same 101
-pairs as all other methods, using the same stratified nested CV outer folds for
-reporting. No hyperparameter tuning was performed (the MANDATORY
-$\leftrightarrow$ PROHIBITED rule and the LLM prompt were fixed before
-evaluation began). Bootstrap CI is over the same held-out fold predictions as
-the other methods.
-
 \textbf{Within-model scope.} Both the Graph-RAG classifier and the flat LLM
 judge use \texttt{claude-haiku-4-5-20251001}. The comparison between them is
 therefore a \textit{within-model ablation}---with vs.\ without explicit
@@ -562,7 +525,7 @@ confirmed with a second model family before generalisation.
 \subsection{LLM Judge (Flat Pairwise)}
 
 Claude Haiku with explicit AGREE / DIVERGE / SILENT definitions, prompted once
-per pair with both texts. No graph, no retrieval. Full prompt in
+per pair with both texts. No graph, no retrieval. Full prompt and code at
 Appendix~\ref{app:prompt}.
 
 %% -------------------------------------------------------------------------
@@ -639,29 +602,13 @@ bootstrap 95\% confidence intervals for all four methods.
 Point estimates increase monotonically from lexical to Graph-RAG to the LLM
 judge. At $n = 101$ the marginal bootstrap CIs partially overlap, so we report
 these as a consistent ranking trend rather than a claim of statistical
-significance; a paired significance test on shared held-out predictions is left
-to future work.
-
-%% -------------------------------------------------------------------------
-\section{Error Analysis: The Lexical Ceiling}
-%% -------------------------------------------------------------------------
-
-The lexical heuristic misclassifies roughly 46 of the 101 pairs
-(accuracy 0.541). The illustrative errors below share a signature:
-\textbf{high lexical overlap, opposed regulatory stance.}
-
-\begin{itemize}
-\item \textbf{uc-sev-03 (DIVERGE $\to$ missed):} FDA ``modified Mayo score of
-  \textit{5 to 9}'' vs.\ EMA ``full Mayo score of \textit{9 to 12}''---near-identical
-  vocabulary, different scoring instrument and threshold.
-\item \textbf{uc-01:} Single-arm Mayo-score endpoint vs.\ co-primary
-  modified-Mayo---same terms, different structural requirement.
-\item \textbf{gene-01:} FDA recommends 15 years; EMA defers to
-  case-by-case---same topic, different specificity.
-\end{itemize}
-
-A bag-of-words model cannot resolve these; they require representing
-\textit{what each requirement asserts about which entity}.
+significance; a paired significance test is left to future work.
+\textbf{Lexical ceiling.} Characteristic errors share the signature of
+\textit{high lexical overlap, opposed regulatory stance}: FDA
+``modified Mayo score of 5--9'' vs.\ EMA ``full Mayo score of 9--12''
+(same vocabulary, different instrument); FDA 15-year LTF vs.\ EMA
+case-by-case (same topic, different specificity). Resolving these requires
+representing what each requirement \textit{asserts}, not surface similarity.
 
 %% -------------------------------------------------------------------------
 \section{Analysis}
@@ -720,40 +667,16 @@ To assess whether performance reflects source-study-specific patterns rather
 than genuine task competence, we analyse performance stratified by track and
 by source concentration.
 
-\textbf{Track-level analysis.} The LLM judge achieves:
-\begin{itemize}
-\item \textbf{Track A} (59 expert-comparison pairs): AGREE F1 = 0.769, DIVERGE F1 = 0.745.
-\item \textbf{Track B} (42 primary guidance pairs): AGREE F1 = 0.966, DIVERGE F1 = 0.923.
-\end{itemize}
-On the contamination-relevant AGREE/DIVERGE classes, performance is
-\textit{not} higher on Track A (the higher source-study exposure split)---it
-is lower. The overall macro-F1 gap (0.630 Track B vs.\ 0.765 Track A) is
-explained by SILENT support ($n = 0$ in Track B vs.\ $n = 21$ in Track A),
-not by memorisation.
+\textbf{Track-level.} On AGREE/DIVERGE classes, the LLM judge scores
+\textit{lower} on Track A (0.769/0.745) than Track B (0.966/0.923): exposure
+to source studies does not inflate performance. The macro-F1 gap (Track B 0.630
+vs.\ Track A 0.765) is explained by SILENT support ($n = 0$ vs.\ $n = 21$),
+not memorisation.
 
-\textbf{Source-concentration analysis.}
-40 of the 101 pairs originate from a single source document
-(\citeauthor{uc2025jcc} UC endpoint paper). To test whether headline
-performance is driven by that stratum, we stratify the LLM judge:
-
-\begin{itemize}
-\item \textbf{JCC-2025 (UC paper, $n = 40$):} macro-F1 = 0.804;
-  AGREE F1 = 0.842 ($n = 11$), DIVERGE F1 = 0.800 ($n = 14$),
-  SILENT F1 = 0.769 ($n = 15$).
-\item \textbf{All other pairs ($n = 61$, Track A non-UC + all Track B):}
-  macro-F1 = 0.844;
-  AGREE F1 = 0.923 ($n = 31$), DIVERGE F1 = 0.810 ($n = 24$),
-  SILENT F1 = 0.800 ($n = 6$).
-\end{itemize}
-
-Performance on the 61 non-JCC pairs (0.844) is marginally \textit{higher}
-than on the concentrated JCC stratum (0.804), ruling out JCC-domain
-inflation as an explanation for the 0.830 headline. The slight gap is
-consistent with DIVERGE being harder in the UC-endpoint domain (many
-same-vocabulary, different-instrument pairs) than in primary guidance text.
-
-Future work should evaluate on guidance issued \textit{after} the model's
-knowledge cutoff to probe temporal contamination independently.
+\textbf{Source-concentration.} 40/101 pairs come from one source
+(\citeauthor{uc2025jcc}). LLM judge on the JCC stratum ($n = 40$): 0.804;
+on all other pairs ($n = 61$): 0.844. Performance is marginally
+\textit{higher} outside JCC, ruling out domain-concentration inflation.
 
 %% -------------------------------------------------------------------------
 \section{Future Work}
@@ -858,59 +781,23 @@ comparison studies. LLM API calls used the Anthropic API (Claude Haiku,
 %%
 \appendix
 
-\section{LLM Judge Prompt}
+\section{Prompts and Code}
 \label{app:prompt}
 
-\textbf{System:}
-\begin{verbatim}
-You are a regulatory-affairs expert comparing FDA and EMA
-guidance documents. Given an FDA requirement and an EMA
-requirement on the same topic, classify their relationship.
+Full prompts (LLM judge system/user, Graph-RAG Stage~1 triplet-extraction,
+Stage~2 graph-classification), evaluation scripts, and dataset schema are
+available at the project repository:
+\url{https://github.com/chuchugo/cross-jurisdiction-regulatory-divergence}
 
-Respond with ONLY a JSON object in this exact format:
-{"label": "<AGREE|DIVERGE|SILENT>", "reason": "<one sentence>"}
+\noindent\textbf{LLM judge} (\texttt{llm\_judge.py}): system prompt defines
+AGREE/DIVERGE/SILENT with explicit absence framing; user prompt pairs
+\texttt{\{fda\_text\}} and \texttt{\{ema\_text\}}.
+Model: \texttt{claude-haiku-4-5-20251001}, temperature 1.0, max tokens 100.
 
-Definitions:
-- AGREE: both jurisdictions require substantively the same thing
-- DIVERGE: the requirements directly conflict (one mandates
-  what the other forbids or softens)
-- SILENT: one jurisdiction does not address what the other
-  regulates
-\end{verbatim}
-
-\textbf{User:}
-\begin{verbatim}
-FDA requirement:
-{fda_text}
-
-EMA requirement:
-{ema_text}
-
-Classify the relationship.
-\end{verbatim}
-
-Model: \texttt{claude-haiku-4-5-20251001}. Temperature: default (1.0).
-Max tokens: 100. Results cached; each pair scored exactly once.
-
-\section{Graph-RAG Prompts}
-\label{app:graph_prompts}
-
-Full prompt text is available in the released code repository
-(\texttt{graph\_rag.py}). The pipeline uses two sequential LLM calls per pair.
-
-\textbf{Stage~1 — Triplet Extraction.} Each requirement is converted to a
-JSON policy node:
-\texttt{\{subject, obligation\_level, requirement, conditions\}},
-where \texttt{obligation\_level} $\in$ \{MANDATORY, PROHIBITED, RECOMMENDED,
-PERMITTED, SILENT\}.
-
-\textbf{Stage~2 — Graph Classification.} The two policy nodes are compared;
-the LLM returns \texttt{\{label, reason\}} with AGREE/DIVERGE/SILENT.
-Key calibration: modal-register differences alone (RECOMMENDED vs.\ MANDATORY)
-do \textit{not} constitute DIVERGE if the substantive requirement is the same.
-
-\textbf{Hard rules (no LLM call):} MANDATORY $\leftrightarrow$ PROHIBITED
-$\Rightarrow$ DIVERGE; both SILENT $\Rightarrow$ SILENT.
-Model: \texttt{claude-haiku-4-5-20251001}; Stage~2 max tokens: 300.
+\noindent\textbf{Graph-RAG} (\texttt{graph\_rag.py}): Stage~1 extracts a
+policy node \texttt{\{subject, obligation\_level, requirement, conditions\}};
+Stage~2 classifies the aligned node pair. Hard rules: MANDATORY
+$\leftrightarrow$ PROHIBITED $\Rightarrow$ DIVERGE (no LLM call); both
+SILENT $\Rightarrow$ SILENT. Max tokens: 300.
 
 \end{document}
