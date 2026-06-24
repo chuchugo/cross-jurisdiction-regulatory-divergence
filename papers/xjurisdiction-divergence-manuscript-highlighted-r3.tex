@@ -1,9 +1,10 @@
 %%
-%% For submission and review, use:
-%%   \documentclass[manuscript, screen, review]{acmart}
-%% For final camera-ready, use:
-%%   \documentclass[sigconf]{acmart}
-%% For single-column venue (current):
+%% RegDivergence-101
+%% Reformatted to the official ACM acmart "sigconf" template.
+%%
+%% For submission/review you may instead use:
+%%   \documentclass[sigconf, review, anonymous]{acmart}
+%% For the camera-ready, use:
 %%   \documentclass[manuscript]{acmart}
 %%
 \documentclass[manuscript]{acmart}
@@ -11,65 +12,34 @@
 \AtBeginDocument{%
   \providecommand\BibTeX{{Bib\TeX}}}
 
-\usepackage{booktabs}
-
-%% ── Venue page-layout requirements ─────────────────────────────────────────
-%% Single column (manuscript mode above); Letter paper; margins:
-%%   top 3.1 cm, bottom 5.01 cm, left 2.54 cm, right 3.6 cm
-%% acmart already loads geometry, so reconfigure after it finalises layout.
-\AtBeginDocument{%
-  \geometry{top=3.1cm, bottom=5.01cm, left=2.54cm, right=3.6cm,
-            letterpaper}%
-}
-%% Override acmart manuscript's 1.5× line spacing.
-%% \setstretch (setspace) updates the internal linespread factor so that
-%% \normalsize re-applications keep single spacing.  We then sync acmart's
-%% guard (\ACM@origbaselinestretch) to the new value so AtEndDocument passes.
-\setstretch{1.0}
-\makeatletter
-\let\ACM@origbaselinestretch\baselinestretch
-\makeatother
-
-%% ── Heading font overrides (Chinese size conventions) ───────────────────────
-%% 小四 (xiǎo sì)  = 12 pt  → paper title
-%% 小五 (xiǎo wǔ)  =  9 pt  → all section levels
-\makeatletter
-%% Paper title: 12 pt bold (left-aligned by \@mktitle@i's \raggedright)
-\def\@titlefont{\fontsize{12}{14}\selectfont\bfseries}
-%% §1 Section: 9 pt bold (uppercase applied via wrapper below)
-\def\@secfont{\fontsize{9}{11}\selectfont\bfseries\section@raggedright}
-%% §2 Subsection: 9 pt bold
-\def\@subsecfont{\fontsize{9}{11}\selectfont\bfseries\section@raggedright}
-%% §3 Subsubsection: 9 pt bold italic  (period appended by acmart's \@adddotafter)
-\def\@subsubsecfont{\fontsize{9}{11}\selectfont\bfseries\itshape}
-\makeatother
-
-%% §1 Section titles must be ALL-CAPS per venue requirements.
-%% \texorpdfstring gives PDF bookmarks the unmodified title while typesetting
-%% in uppercase — avoids hyperref's "MakeUppercase unsupported in PdfStrings".
-\makeatletter
-\let\@acmt@@section\section
-\renewcommand{\section}[1]{%
-  \@acmt@@section{\texorpdfstring{\MakeUppercase{#1}}{#1}}}
-\makeatother
-
-%% Remove the "ACM Reference Format" block from the first page
-\settopmatter{printacmref=false}
-
-%% Render all hyperlinks (citations, URLs, author names) in black
-\hypersetup{hidelinks}
-
-%% Rights — fill in from ACM rights confirmation email after acceptance
+%% Rights — replace these SAMPLE values with the commands from your ACM
+%% rights-confirmation email after acceptance.
 \setcopyright{acmlicensed}
 \copyrightyear{2026}
 \acmYear{2026}
 \acmDOI{XXXXXXX.XXXXXXX}
-\acmConference[AIFM '26]{2026 2nd International Conference on Artificial Intelligence and Foundation Model}{June 26--28, 2026}{Urumqi, China}
+\acmConference[AIFM '26]{2026 2nd International Conference on Artificial
+  Intelligence and Foundation Model}{June 26--28, 2026}{Urumqi, China}
 \acmISBN{979-8-4007-2458-9}
 
 %%
 %% Submission ID — uncomment and fill in when assigned
 %%\acmSubmissionID{XXX-XXXX}
+
+%% --- Revision highlighting (yellow) -------------------------------------
+%% Marks passages revised in response to reviewers R1-R4. To produce a clean
+%% final copy, delete this block and all \begin{revblock}/\end{revblock} pairs.
+\usepackage[most]{tcolorbox}
+\definecolor{revyellow}{RGB}{255,233,79}
+\newtcolorbox{revblock}{%
+  breakable, enhanced, sharp corners, boxrule=0pt, frame hidden,
+  colback=revyellow, boxsep=1.5pt, left=3pt, right=3pt, top=2pt, bottom=2pt,
+  before skip=4pt, after skip=4pt, pad at break*=0mm}
+%% ------------------------------------------------------------------------
+
+%% Fit-to-margin helpers (single-column): allow long \texttt tokens to break
+\usepackage[htt]{hyphenat}
+\emergencystretch=2em
 
 \begin{document}
 
@@ -128,10 +98,8 @@
 %%
 %% Abstract
 %%
-%% [R2, R3] Added per-direction SILENT evaluation note; retained "pilot"
-%% framing from r1; clarified evaluation-benchmark positioning.
-%%
 \begin{abstract}
+\begin{revblock}
 Pharmaceutical sponsors developing a drug for both the United States and the
 European Union must reconcile guidance issued independently by the FDA and the
 EMA. Where the two agencies require \textit{substantively the same thing}, a
@@ -159,6 +127,7 @@ architectural target for large-scale silent-detection. RegDivergence-101 is a
 pilot release establishing the task formulation and baseline hierarchy; four
 unrepresented regulatory domains and an expansion roadmap are described in
 \S\ref{sec:futurework}.
+\end{revblock}
 \end{abstract}
 
 %%
@@ -222,10 +191,7 @@ them to detect divergence between two parallel regulatory corpora from different
 jurisdictions.} All existing contradiction work is \textit{intra-document}
 (within one contract) or \textit{single-jurisdiction} (contract-vs-statute).
 
-%%
-%% [R1, R2, R3] Expanded contribution descriptions to note task scope,
-%% pilot status, unrepresented domains, and per-direction SILENT evaluation.
-%%
+\begin{revblock}
 This paper makes three contributions:
 \begin{enumerate}
 \item \textbf{Task formulation.} Cross-jurisdiction regulatory divergence
@@ -249,6 +215,7 @@ This paper makes three contributions:
   corpus-level solution. Observations are reported with bootstrap 95\% CIs;
   confirmatory significance testing awaits a larger benchmark.
 \end{enumerate}
+\end{revblock}
 
 %% -------------------------------------------------------------------------
 \section{Related Work}
@@ -293,6 +260,21 @@ labelling~\cite{gomezfernandez2026inhibitors}, and multi-country
 SmPCs~\cite{pvverse2026}, but as human-authored comparisons, not ML benchmarks.
 RegDivergence-101 is the first FDA/EMA benchmark with an explicit SILENT class.
 
+\begin{revblock}
+\textbf{Foundation models and AI governance beyond text.} The momentum of
+foundation models now spans multimodal scientific modelling~\cite{11541222},
+vector-graphics generation~\cite{liang2026render} and animation~\cite{liang2026vanim},
+and vision-language navigation~\cite{zeng2025janusvln}, while parameter-efficient
+domain adaptation and ensembling of small language models~\cite{codes2026} lower
+deployment cost. In high-stakes sectors such as healthcare, deep-learning
+deployment is increasingly governed by policy-aligned evaluation frameworks that
+weigh safety and regulatory constraints over raw accuracy~\cite{chen2026dlsg}.
+RegDivergence-101 extends this momentum to cross-jurisdiction regulatory
+reasoning, a high-stakes text domain that remains underrepresented in current
+foundation-model evaluation.
+
+\end{revblock}
+
 \textbf{Gap.} Contradiction detection is intra-document or
 single-jurisdiction; Graph-RAG targets single-corpus QA or
 single-jurisdiction compliance; FDA/EMA divergence is documented manually but
@@ -302,12 +284,10 @@ never automated. Our task sits precisely in this gap.
 \section{Task and Dataset}
 %% -------------------------------------------------------------------------
 
-%% [R2] Expanded task definition to document SILENT directionality explicitly
-%% and add corpus-search note.
-%%
 \subsection{Task Definition}
 \label{sec:taskdef}
 
+\begin{revblock}
 For a topic $t$, let $f_t$ be an FDA requirement statement and $e_t$ the
 corresponding EMA statement. The label $y_t$ is:
 \begin{itemize}
@@ -354,14 +334,12 @@ that \textit{already provide aligned pairs} and from a two-track alignment
 procedure described in \S\ref{sec:dataset}; we treat topic alignment as a
 separate, upstream task and refer readers to \S\ref{sec:futurework} for the
 corpus-level architecture that would encompass it.
+\end{revblock}
 
-%% [R1, R2, R3, R4] Major structural revision of the dataset section.
-%% Original single subsection split into §3.2 (Pair Construction Protocol)
-%% and §3.3 (Annotation Protocol) to document methodology transparently.
-%%
 \subsection{Pair Construction Protocol}
 \label{sec:dataset}
 
+\begin{revblock}
 RegDivergence-101 is constructed via two tracks that differ in how topical
 correspondence between FDA and EMA requirements is established. Per-pair
 source-track attribution (\texttt{track}: A or B) is released with the dataset.
@@ -419,10 +397,12 @@ Each pair records
 silent\_direction, doc\_confidence, disputed, annotation\_notes\}}.
 The combined release contains \textbf{101 pairs}: 42 AGREE, 38 DIVERGE, 21
 SILENT, across 13 topic areas. We report macro-F1 to weight all classes equally.
+\end{revblock}
 
 \subsection{Annotation Protocol}
 \label{sec:annotation}
 
+\begin{revblock}
 \textbf{Annotators.} Annotator~A (C.~Wu) is a solution architect for a
 regulatory-document AI platform; Annotator~B (Z.~Zhou) is a product manager for
 an AI-powered clinical-trial management platform. Neither holds formal RA
@@ -452,23 +432,22 @@ genuinely borderline pairs retain the Stage~1 label and are flagged
 \texttt{doc\_confidence = MODERATE}: exhaustive corpus search was performed
 (full FDA and EMA guidance, Q\&As, reflection papers) but absence claims remain
 epistemically soft. The HIGH/MODERATE audit is deferred to RegDivergence-500.
+\end{revblock}
 
 %% -------------------------------------------------------------------------
 \section{Baselines}
 %% -------------------------------------------------------------------------
 
-%%
-%% [R3] Added benchmark comparison table and power analysis before method
-%% descriptions to clarify evaluation-benchmark positioning.
-%%
 \subsection{Evaluation Context}
 \label{sec:eval_context}
 
+\begin{revblock}
 RegDivergence-101 is an \textbf{evaluation benchmark}, not a training dataset.
 All four baselines are zero-shot or few-shot. Adjacent methods are separated by
 $\Delta = 0.15$--$0.60$ macro-F1 (min: Graph-RAG vs.\ LLM, $\Delta = 0.167$;
 CIs partially overlapping); bootstrap CI half-widths $\approx \pm 0.08$--$0.10$
 at $n = 101$. Results are reported as a ranking trend, not pairwise significance.
+\end{revblock}
 
 \subsection{Shared Evaluation Protocol}
 
@@ -540,6 +519,7 @@ bootstrap 95\% confidence intervals for all four methods.
   \caption{Macro-F1, accuracy, and per-class F1 with bootstrap 95\% confidence
     intervals for the four baselines ($n = 101$ pairs).}
   \label{tab:results}
+  \resizebox{\textwidth}{!}{%
   \begin{tabular}{llllll}
     \toprule
     Method & Macro-F1 [95\% CI] & Acc & AGREE F1 [CI] & DIVERGE F1 [CI] & SILENT F1 [CI] \\
@@ -558,7 +538,7 @@ bootstrap 95\% confidence intervals for all four methods.
       & \textbf{0.905 [0.831--0.965]} & \textbf{0.805 [0.696--0.892]}
       & \textbf{0.778 [0.609--0.914]} \\
     \bottomrule
-  \end{tabular}
+  \end{tabular}}
   \smallskip\\
   {\small $^1$Nested 5-fold CV, 5 seeds; thresholds tuned on inner folds only.
   $^2$Same CV protocol, thresholds tuned on inner folds.
@@ -568,11 +548,6 @@ bootstrap 95\% confidence intervals for all four methods.
   101 pairs.}
 \end{table*}
 
-%%
-%% [R2] New per-direction SILENT table. Values require reading
-%% silent_direction field from data/benchmark.csv and re-running
-%% bootstrap_ci.py with --stratify-silent flag (see experiments repo).
-%%
 \begin{table}[h]
   \caption{Per-direction SILENT F1 for all four methods (bootstrap 95\% CI,
     $n=101$ pairs). SILENT\_FDA ($n=13$): FDA is silent, EMA regulates.
@@ -655,14 +630,10 @@ are different tasks. This paper establishes baselines for the pair-level scope;
 contribution. This observation is architectural and directional; it is not a
 validated finding.
 
-%%
-%% [R3] Source-stratified performance analysis moved from §Limitations and
-%% expanded as a proper Analysis subsection. Explicitly reframes the
-%% contamination probe as a source-bias check.
-%%
 \subsection{Source-Stratified Performance Analysis}
 \label{sec:source_stratified}
 
+\begin{revblock}
 To assess whether performance reflects source-study-specific patterns rather
 than genuine task competence, we analyse performance stratified by track and
 by source concentration.
@@ -677,6 +648,7 @@ not memorisation.
 (\citeauthor{uc2025jcc}). LLM judge on the JCC stratum ($n = 40$): 0.804;
 on all other pairs ($n = 61$): 0.844. Performance is marginally
 \textit{higher} outside JCC, ruling out domain-concentration inflation.
+\end{revblock}
 
 %% -------------------------------------------------------------------------
 \section{Future Work}

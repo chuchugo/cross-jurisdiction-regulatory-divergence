@@ -1,0 +1,747 @@
+%%
+%% RegDivergence-101
+%% Reformatted to the official ACM acmart "sigconf" template.
+%%
+%% For submission/review you may instead use:
+%%   \documentclass[sigconf, review, anonymous]{acmart}
+%% For the camera-ready, use:
+%%   \documentclass[manuscript]{acmart}
+%%
+\documentclass[manuscript]{acmart}
+
+\AtBeginDocument{%
+  \providecommand\BibTeX{{Bib\TeX}}}
+
+%% Rights — replace these SAMPLE values with the commands from your ACM
+%% rights-confirmation email after acceptance.
+\setcopyright{acmlicensed}
+\copyrightyear{2026}
+\acmYear{2026}
+\acmDOI{XXXXXXX.XXXXXXX}
+\acmConference[AIFM '26]{2026 2nd International Conference on Artificial
+  Intelligence and Foundation Model}{June 26--28, 2026}{Urumqi, China}
+\acmISBN{979-8-4007-2458-9}
+
+%%
+%% Submission ID — uncomment and fill in when assigned
+%%\acmSubmissionID{XXX-XXXX}
+
+%% Fit-to-margin helpers (single-column): allow long \texttt tokens to break
+\usepackage[htt]{hyphenat}
+\emergencystretch=2em
+
+\begin{document}
+
+%%
+%% Title. Use \title[short title]{full title} when the full title is long.
+%%
+\title[RegDivergence-101]{RegDivergence-101: An LLM Benchmark for
+  Cross-Jurisdiction Regulatory Contradiction Detection in Life Sciences}
+
+%%
+%% Authors
+%%
+\author{Chuchu Wu}
+\authornote{Corresponding author.}
+\email{chuchuw@alumni.cmu.edu}
+\orcid{0009-0006-5140-2247}
+\affiliation{%
+  \institution{Carnegie Mellon University}
+  \city{Pittsburgh}
+  \state{PA}
+  \country{USA}
+}
+
+\author{Zhiyin Zhou}
+\email{zzhou20@pratt.edu}
+\orcid{0009-0004-5139-4668}
+\affiliation{%
+  \institution{Pratt Institute}
+  \city{New York}
+  \state{NY}
+  \country{USA}
+}
+
+\author{Jingzhuo Hu}
+\email{jingzhuoh00@gmail.com}
+\orcid{0009-0008-0206-8531}
+\affiliation{%
+  \institution{University of Pennsylvania}
+  \city{Philadelphia}
+  \state{PA}
+  \country{USA}
+}
+
+\author{Liang You}
+\email{liy121@pitt.edu}
+\orcid{0009-0002-8773-0614}
+\affiliation{%
+  \institution{University of Pittsburgh}
+  \city{Pittsburgh}
+  \state{PA}
+  \country{USA}
+}
+
+\renewcommand{\shortauthors}{Wu et al.}
+
+%%
+%% Abstract
+%%
+\begin{abstract}
+Pharmaceutical sponsors developing a drug for both the United States and the
+European Union must reconcile guidance issued independently by the FDA and the
+EMA. Where the two agencies require \textit{substantively the same thing}, a
+sponsor can file once; where they \textit{diverge}, a single trial design risks
+rejection in one region; where one agency is \textit{silent} on a point the
+other regulates, the sponsor must infer obligations. Today this reconciliation
+is performed manually by regulatory-affairs experts. We introduce
+\textbf{cross-jurisdiction regulatory divergence detection}: given an FDA
+requirement and an EMA requirement on the same topic, classify their
+relationship as AGREE, DIVERGE, or SILENT. SILENT is inherently directional
+(SILENT\_FDA vs.\ SILENT\_EMA); we record direction per pair and report
+per-direction F1 alongside the collapsed label. We release
+\textbf{RegDivergence-101}, a 101-pair expert-grounded \textbf{pilot}
+evaluation benchmark (labels grounded in three peer-reviewed FDA/EMA
+comparison studies and primary FDA/EMA/ICH guidance text; dual-annotation
+inter-annotator $\kappa = 0.85$), and systematically characterise a four-method
+baseline hierarchy: lexical heuristic (0.511 macro-F1, 95\% CI [0.411--0.605]), NLI
+cross-encoder (0.233), obligation-level Graph-RAG (0.663 [0.570--0.747]), and
+flat LLM judge / Claude Haiku (0.830 [0.747--0.908]). Three directional
+observations emerge at pilot scale ($n = 101$): SILENT is semantically
+detectable but invisible to entailment-only formulations; pair-level obligation
+graphs improve over lexical methods but trail flat-LLM context (CIs partially
+overlapping); and corpus-level graph construction is the indicated
+architectural target for large-scale silent-detection. RegDivergence-101 is a
+pilot release establishing the task formulation and baseline hierarchy; four
+unrepresented regulatory domains and an expansion roadmap are described in
+\S\ref{sec:futurework}.
+\end{abstract}
+
+%%
+%% CCS Concepts — generated from https://dl.acm.org/ccs
+%%
+\begin{CCSXML}
+<ccs2012>
+  <concept>
+    <concept_id>10010147.10010257</concept_id>
+    <concept_desc>Computing methodologies~Natural language processing</concept_desc>
+    <concept_significance>500</concept_significance>
+  </concept>
+  <concept>
+    <concept_id>10002951.10003317.10003347</concept_id>
+    <concept_desc>Information systems~Document filtering</concept_desc>
+    <concept_significance>300</concept_significance>
+  </concept>
+  <concept>
+    <concept_id>10003456.10003457.10003527</concept_id>
+    <concept_desc>Applied computing~Health informatics</concept_desc>
+    <concept_significance>300</concept_significance>
+  </concept>
+</ccs2012>
+\end{CCSXML}
+
+\ccsdesc[500]{Computing methodologies~Natural language processing}
+\ccsdesc[300]{Information systems~Document filtering}
+\ccsdesc[300]{Applied computing~Health informatics}
+
+%%
+%% Keywords
+%%
+\keywords{large language models, LLM benchmark, regulatory NLP, AI for
+  compliance, FDA/EMA divergence, contradiction detection, Graph-RAG,
+  retrieval-augmented generation, generative AI, life sciences,
+  AGREE/DIVERGE/SILENT classification}
+
+\maketitle
+
+%% -------------------------------------------------------------------------
+\section{Introduction}
+%% -------------------------------------------------------------------------
+
+Bringing a medicine to market in both the US and EU requires satisfying two
+regulators that publish guidance separately and frequently \textit{differently}.
+Gene-therapy sponsors face a 15-year long-term follow-up recommendation from FDA
+while EMA defers the duration to case-by-case risk assessment---same topic,
+materially different specificity. Analogous divergences span pediatric
+extrapolation, endpoint definitions in ulcerative colitis, biosimilar
+comparability, and estimand implementation. A sponsor who misses one divergence
+during protocol design can lose a year or more re-running a study.
+
+Reconciling the two corpora is currently a manual, expert task. Yet the NLP
+building blocks for automating it all exist---document-level NLI
+(ContractNLI~\cite{koreeda2021contractnli}, DocNLI~\cite{yin2021docnli}),
+legal contradiction detection (LegalWiz~\cite{legalwiz2025},
+CLAUSE~\cite{betterclause2026}), and Graph-RAG (Microsoft
+GraphRAG~\cite{edge2024graphrag}, GraphCompliance~\cite{graphcompliance2025},
+RAGulating Compliance~\cite{ragulating2025}). \textbf{No prior work combines
+them to detect divergence between two parallel regulatory corpora from different
+jurisdictions.} All existing contradiction work is \textit{intra-document}
+(within one contract) or \textit{single-jurisdiction} (contract-vs-statute).
+
+This paper makes three contributions:
+\begin{enumerate}
+\item \textbf{Task formulation.} Cross-jurisdiction regulatory divergence
+  detection as a three-way classification (AGREE / DIVERGE / SILENT) over
+  pre-aligned FDA/EMA requirement pairs, grounded in published expert
+  comparisons. The task is explicitly scoped to the \textit{classification}
+  stage given pre-aligned pairs; topic alignment is a non-trivial upstream
+  problem addressed in \S\ref{sec:taskdef} and \S\ref{sec:dataset}. SILENT
+  is treated as directional (SILENT\_FDA vs.\ SILENT\_EMA); we report
+  per-direction F1 in Table~\ref{tab:silent_direction}.
+\item \textbf{Pilot benchmark.} \textbf{RegDivergence-101}, a pilot 101-pair
+  benchmark (59 from peer-reviewed FDA/EMA comparison studies, 42 derived from
+  primary FDA/EMA/ICH guidance) spanning 13 topic areas, with a documented
+  two-track pair-construction protocol, inter-annotator agreement
+  ($\kappa = 0.85$), and bootstrap confidence intervals. Four regulatory
+  domains are currently unrepresented; \S\ref{sec:futurework} describes the
+  expansion roadmap.
+\item \textbf{Baseline hierarchy with three directional observations.} Four
+  methods systematically compared at pilot scale ($n = 101$), yielding
+  directional empirical observations on the task's structure and the path to a
+  corpus-level solution. Observations are reported with bootstrap 95\% CIs;
+  confirmatory significance testing awaits a larger benchmark.
+\end{enumerate}
+
+%% -------------------------------------------------------------------------
+\section{Related Work}
+%% -------------------------------------------------------------------------
+
+\textbf{Document-level NLI.} ContractNLI~\cite{koreeda2021contractnli} introduced
+document-level entailment/contradiction/not-mentioned classification with
+evidence extraction, and showed that contradiction detection lags entailment,
+especially under ``negation by exception.'' DocNLI~\cite{yin2021docnli} extended
+NLI to full documents.
+
+\textbf{Legal contradiction detection (2025--2026).}
+LegalWiz~\cite{legalwiz2025} uses a multi-agent generation framework for legal
+contradiction detection but is confined to single-document regimes. Better Call
+CLAUSE~\cite{betterclause2026} benchmarks 7,500+
+perturbed contracts across ten anomaly categories and finds that LLMs miss
+subtle errors and struggle to \textit{justify} them legally. Contradiction
+Detection in RAG Systems~\cite{contradictionrag2025} uses LLMs as context
+validators. Two recent RAG-faithfulness studies bear directly on our LLM-judge
+and graph-RAG results: \citet{chen2026ragwrong} probe whether a RAG system can
+recognise when retrieved context is incorrect, and \citet{qian2026evidenceforce}
+show that the surface relevance of retrieved evidence does not guarantee it
+\textit{warrants} a claim---the same failure mode documented in our Observation~2, where
+modal-register similarity (RECOMMENDED vs.\ MANDATORY) misleads the pair-level
+graph.
+
+\textbf{Graph-RAG and regulatory compliance.}
+Microsoft GraphRAG~\cite{edge2024graphrag} builds entity graphs with community
+summaries for local and global queries. GraphCompliance~\cite{graphcompliance2025}
+aligns \textit{policy graphs} (regulatory requirements) with \textit{context
+graphs} (organisational facts) for GDPR; it explicitly lists ``handling
+conflicting regulatory interpretations'' as open. RAGulating
+Compliance~\cite{ragulating2025} builds an ontology-free regulatory knowledge
+graph for traceable QA.
+
+\textbf{Cross-jurisdiction regulatory benchmarks.}
+The closest concurrent work is \textbf{Sino-US-DrugQA}~\cite{sinousdrugqa2026}
+(11{,}871 MCQA items, US--CN), which shares our concept-alignment thesis but
+cannot express the SILENT class. Comparative-regulatory-science surveys document
+FDA/EMA divergence across dosing~\cite{mita2026doses}, oncology
+labelling~\cite{gomezfernandez2026inhibitors}, and multi-country
+SmPCs~\cite{pvverse2026}, but as human-authored comparisons, not ML benchmarks.
+RegDivergence-101 is the first FDA/EMA benchmark with an explicit SILENT class.
+
+\textbf{Foundation models and AI governance beyond text.} The momentum of
+foundation models now spans multimodal scientific modelling~\cite{11541222},
+vector-graphics generation~\cite{liang2026render} and animation~\cite{liang2026vanim},
+and vision-language navigation~\cite{zeng2025janusvln}, while parameter-efficient
+domain adaptation and ensembling of small language models~\cite{codes2026} lower
+deployment cost. In high-stakes sectors such as healthcare, deep-learning
+deployment is increasingly governed by policy-aligned evaluation frameworks that
+weigh safety and regulatory constraints over raw accuracy~\cite{chen2026dlsg}.
+RegDivergence-101 extends this momentum to cross-jurisdiction regulatory
+reasoning, a high-stakes text domain that remains underrepresented in current
+foundation-model evaluation.
+
+\textbf{Gap.} Contradiction detection is intra-document or
+single-jurisdiction; Graph-RAG targets single-corpus QA or
+single-jurisdiction compliance; FDA/EMA divergence is documented manually but
+never automated. Our task sits precisely in this gap.
+
+%% -------------------------------------------------------------------------
+\section{Task and Dataset}
+%% -------------------------------------------------------------------------
+
+\subsection{Task Definition}
+\label{sec:taskdef}
+
+For a topic $t$, let $f_t$ be an FDA requirement statement and $e_t$ the
+corresponding EMA statement. The label $y_t$ is:
+\begin{itemize}
+\item \textbf{AGREE} --- both jurisdictions require substantively the same
+  thing (same modal strength, same threshold, same scope of applicability).
+  Paraphrase equivalence and synonymous modals (\textit{shall} / \textit{must})
+  are treated as AGREE; minor drafting differences that do not alter sponsor
+  obligations are disregarded.
+\item \textbf{DIVERGE} --- the requirements directly conflict: they impose
+  different thresholds, different modal strengths (\textit{shall} vs.\
+  \textit{should}), different timelines, or mutually incompatible design
+  specifications.
+\item \textbf{SILENT} --- one jurisdiction does not address what the other
+  regulates. SILENT is \textit{directional} by construction:
+  \begin{itemize}
+    \item \textbf{SILENT\_FDA}: FDA is silent on this topic; an EMA requirement
+      exists but no corresponding FDA requirement was found in the full published
+      FDA corpus (guidance documents, Q\&As, MaPPs).
+    \item \textbf{SILENT\_EMA}: EMA is silent on this topic; an FDA requirement
+      exists but no corresponding EMA requirement was found in the full published
+      EMA corpus (guidelines, Q\&As, reflection papers).
+  \end{itemize}
+  RegDivergence-101 records direction in the \texttt{silent\_direction} field
+  and reports per-direction F1 in Table~\ref{tab:silent_direction}. A unified
+  \textbf{SILENT} label (= SILENT\_FDA $\cup$ SILENT\_EMA) is retained in
+  Table~\ref{tab:results} for backward compatibility.
+\end{itemize}
+
+\textbf{Epistemic status of SILENT labels.}
+A SILENT label is an absence claim: it asserts that no counterpart requirement
+was found after an exhaustive corpus search. This carries irreducible epistemic
+uncertainty. We bound this uncertainty through (a) a documented corpus-search
+protocol (\S\ref{sec:annotation}) and (b) a per-pair \texttt{doc\_confidence}
+flag (HIGH / MODERATE). Downstream work should treat MODERATE-confidence SILENT
+pairs as soft labels.
+
+\textbf{Task scope and assumptions.} This formulation assumes requirement pairs
+are \textit{pre-aligned}---both the FDA and EMA sides address the same
+regulatory topic. Topic alignment is a non-trivial upstream problem: FDA and
+EMA guidance frequently address overlapping domains at inconsistent levels of
+specificity, making it unclear whether two requirements are ``on the same
+topic'' at all. RegDivergence-101 is constructed from expert-panel comparisons
+that \textit{already provide aligned pairs} and from a two-track alignment
+procedure described in \S\ref{sec:dataset}; we treat topic alignment as a
+separate, upstream task and refer readers to \S\ref{sec:futurework} for the
+corpus-level architecture that would encompass it.
+
+\subsection{Pair Construction Protocol}
+\label{sec:dataset}
+
+RegDivergence-101 is constructed via two tracks that differ in how topical
+correspondence between FDA and EMA requirements is established. Per-pair
+source-track attribution (\texttt{track}: A or B) is released with the dataset.
+
+\textbf{Track A --- expert-comparison-derived pairs (59 pairs, 58.4\%).}
+All 59 pairs were extracted from three open-access peer-reviewed studies whose
+explicit purpose was comparative mapping of FDA and EMA requirements in a
+defined therapeutic domain:
+
+\begin{enumerate}
+\item \citet{uc2025jcc} --- ulcerative colitis endpoints and trial design
+  (40 pairs).
+\item \citet{pmc8157504} --- psychiatric drug-trial guidelines (10 pairs).
+\item \citet{pmc6529498} --- radiopharmaceutical nonclinical requirements
+  (9 pairs).
+\end{enumerate}
+
+In each source paper, domain experts had already established co-topicality
+through structured literature mapping or side-by-side dossier comparison.
+Our annotation task for Track A was to classify the \textit{relationship}
+(AGREE / DIVERGE / SILENT) between requirements that the source authors had
+already deemed co-topical. We inherit, document, and cite their alignment
+judgements; per-pair source-study attribution is released with the dataset.
+
+\textbf{Track B --- primary guidance pairs (42 pairs, 41.6\%).}
+For pairs derived from ICH E9(R1), E11A~\cite{iche11a2024}, and FDA/EMA
+biosimilar and gene-therapy guidance, topical alignment was established in
+two steps:
+
+\begin{enumerate}
+\item \textit{Anchor identification.} Requirements were associated with ICH
+  Common Technical Document (CTD) module and sub-topic designations (e.g.,
+  Module 5.3.5.1 for comparative bioavailability study reports). Requirements
+  sharing the same CTD anchor were candidate pairs.
+\item \textit{Expert confirmation.} The primary annotator independently
+  reviewed each candidate pair and confirmed or rejected co-topicality before
+  the pair entered the dataset.
+\end{enumerate}
+
+\textbf{Specificity exclusion criterion.}
+A candidate Track B pair was excluded if the FDA and EMA requirements operated
+at different levels of the regulatory hierarchy (e.g., one requirement
+addressing trial design at the \textit{statistical analysis plan} level while
+the other addressed the same concept at the level of \textit{general
+statistical principles}). Such pairs would conflate regulatory
+level-of-detail differences with substantive DIVERGE labels.
+A small number of candidate pairs were excluded on this basis (the count and
+representative cases are documented in the released dataset's
+\texttt{excluded\_pairs.jsonl} file). The complete exclusion-criteria checklist
+is released with the dataset so third parties can audit or extend our alignment
+judgements.
+
+Each pair records
+\texttt{\{id, topic, track, source, fda\_text, ema\_text, label,
+silent\_direction, doc\_confidence, disputed, annotation\_notes\}}.
+The combined release contains \textbf{101 pairs}: 42 AGREE, 38 DIVERGE, 21
+SILENT, across 13 topic areas. We report macro-F1 to weight all classes equally.
+
+\subsection{Annotation Protocol}
+\label{sec:annotation}
+
+\textbf{Annotators.} Annotator~A (C.~Wu) is a solution architect for a
+regulatory-document AI platform; Annotator~B (Z.~Zhou) is a product manager for
+an AI-powered clinical-trial management platform. Neither holds formal RA
+credentialing; Track A expert-panel papers serve as the external human-expert
+anchor.
+
+\textbf{Stages.} Stage~1: Wu assigned labels using a definitions-based framing
+(Track A labels inferred from source authors' stated assessments; Track B labels
+assigned against full guidance text). Stage~2: Zhou independently re-labelled
+all 101 pairs under a sponsor-obligation framing to probe framing-independent
+stability. Both annotators are co-authors; the $\kappa$ is a cross-framing
+consistency measure, not identical-instruction IAA. An independent
+third-annotator pass is planned for RegDivergence-500.
+
+\textbf{IAA.} Human cross-framing $\kappa = 0.85$ (3-class, 101 pairs;
+observed agreement 0.90)---\textit{substantial} per \citet{landis1977kappa},
+on par with MedNLI (0.65) and ContractNLI ($\approx$0.72). SILENT is
+near-perfect ($\kappa = 0.98$); AGREE/DIVERGE more variable ($\approx$0.79--0.81).
+A secondary LLM prompt-robustness check on a 36-pair sample yielded
+$\kappa = 0.542$ (LLM test-retest, not human IAA).
+
+\textbf{Disagreements (n = 10).} Six resolved by source-paper language; four
+genuinely borderline pairs retain the Stage~1 label and are flagged
+\texttt{disputed = True} in the dataset with written justifications.
+
+\textbf{SILENT confidence.} All 21 SILENT pairs carry
+\texttt{doc\_confidence = MODERATE}: exhaustive corpus search was performed
+(full FDA and EMA guidance, Q\&As, reflection papers) but absence claims remain
+epistemically soft. The HIGH/MODERATE audit is deferred to RegDivergence-500.
+
+%% -------------------------------------------------------------------------
+\section{Baselines}
+%% -------------------------------------------------------------------------
+
+\subsection{Evaluation Context}
+\label{sec:eval_context}
+
+RegDivergence-101 is an \textbf{evaluation benchmark}, not a training dataset.
+All four baselines are zero-shot or few-shot. Adjacent methods are separated by
+$\Delta = 0.15$--$0.60$ macro-F1 (min: Graph-RAG vs.\ LLM, $\Delta = 0.167$;
+CIs partially overlapping); bootstrap CI half-widths $\approx \pm 0.08$--$0.10$
+at $n = 101$. Results are reported as a ranking trend, not pairwise significance.
+
+\subsection{Shared Evaluation Protocol}
+
+We evaluate four methods under a shared reporting framework:
+\textbf{stratified 5-fold splits} averaged over 5 random seeds, with
+\textbf{bootstrap 95\% CI} (1{,}000 resamples). The protocol differs by
+method class. The lexical heuristic and NLI cross-encoder have tunable
+thresholds and use \textbf{nested} CV (inner folds tune thresholds, outer folds
+report). The Graph-RAG classifier and LLM judge have no tunable
+hyperparameters: the Graph-RAG classifier is reported over the same outer
+folds, and the LLM judge is scored directly on all 101 pairs. CIs for both LLM
+methods are bootstrap-only.
+
+\subsection{Lexical Heuristic}
+
+No neural model, no API---fully offline and deterministic. Combines TF-IDF
+cosine similarity with five conflict signals: negation asymmetry, divergence
+cue pairs (e.g., \textit{single-arm} vs.\ \textit{randomised}), modal-strength
+asymmetry (\textit{must/shall} vs.\ \textit{may/encouraged}),
+numeric-threshold mismatch, and one-sided specificity (concrete number
+vs.\ case-by-case deferral). A shared ICH citation is a strong AGREE signal.
+
+\subsection{NLI Cross-Encoder}
+
+\texttt{typeform/distilbert-base-uncased-mnli}, run in both directions; labels
+derived from contradiction/neutral/entailment probabilities with CV-tuned
+thresholds. We use DistilBERT-MNLI as a representative off-the-shelf NLI
+system. The structural SILENT gap observed in \S\ref{sec:discussion} (Observation~1)
+is model-agnostic: any NLI model lacking an explicit SILENT output class will
+map absence-of-regulation to \textit{neutral}, collapsing SILENT recall.
+Substituting DeBERTa-v3-large or a modern cross-encoder would improve
+AGREE/DIVERGE F1 but would not resolve the SILENT structural gap without
+task-specific supervision.
+
+\subsection{Graph-RAG Pair-Level Classifier}
+
+For each text, Claude Haiku extracts a policy triplet
+$\langle$\textit{subject, obligation\_level, requirement, conditions}$\rangle$
+where $\text{obligation\_level} \in \{\text{MANDATORY}, \text{PROHIBITED},
+\text{RECOMMENDED}, \text{PERMITTED}, \text{SILENT}\}$. Only
+MANDATORY~$\leftrightarrow$~PROHIBITED is a hard-coded DIVERGE rule; all other
+pairs are escalated to a second LLM call that reasons over the
+\textit{obligation structure} of the aligned node pair, with explicit
+calibration that modal-register differences (RECOMMENDED vs.\ MANDATORY) do not
+automatically imply DIVERGE.
+
+\textbf{Within-model scope.} Both the Graph-RAG classifier and the flat LLM
+judge use \texttt{claude-haiku-4-5-20251001}. The comparison between them is
+therefore a \textit{within-model ablation}---with vs.\ without explicit
+obligation-graph structure---not an architectural comparison across model
+families. Conclusions about the relative value of graph structure should be
+confirmed with a second model family before generalisation.
+
+\subsection{LLM Judge (Flat Pairwise)}
+
+Claude Haiku with explicit AGREE / DIVERGE / SILENT definitions, prompted once
+per pair with both texts. No graph, no retrieval. Full prompt and code at
+Appendix~\ref{app:prompt}.
+
+%% -------------------------------------------------------------------------
+\section{Results}
+\label{sec:results}
+%% -------------------------------------------------------------------------
+
+Table~\ref{tab:results} reports macro-F1, accuracy, and per-class F1 with
+bootstrap 95\% confidence intervals for all four methods.
+
+\begin{table*}
+  \caption{Macro-F1, accuracy, and per-class F1 with bootstrap 95\% confidence
+    intervals for the four baselines ($n = 101$ pairs).}
+  \label{tab:results}
+  \resizebox{\textwidth}{!}{%
+  \begin{tabular}{llllll}
+    \toprule
+    Method & Macro-F1 [95\% CI] & Acc & AGREE F1 [CI] & DIVERGE F1 [CI] & SILENT F1 [CI] \\
+    \midrule
+    Lexical heuristic$^1$
+      & 0.511 [0.411--0.605] & 0.541
+      & 0.718 [0.605--0.809] & 0.466 [0.320--0.593] & 0.334 [0.133--0.537] \\
+    NLI cross-encoder$^2$
+      & 0.233 [0.152--0.303] & 0.238
+      & 0.279 [0.103--0.449] & 0.383 [0.247--0.506] & 0.025 [0.000--0.086] \\
+    Graph-RAG pair-level$^3$
+      & 0.663 [0.570--0.747] & 0.673
+      & 0.754 [0.646--0.851] & 0.586 [0.433--0.722] & 0.640 [0.478--0.771] \\
+    \textbf{LLM judge (Haiku)}$^4$
+      & \textbf{0.830 [0.747--0.908]} & \textbf{0.842}
+      & \textbf{0.905 [0.831--0.965]} & \textbf{0.805 [0.696--0.892]}
+      & \textbf{0.778 [0.609--0.914]} \\
+    \bottomrule
+  \end{tabular}}
+  \smallskip\\
+  {\small $^1$Nested 5-fold CV, 5 seeds; thresholds tuned on inner folds only.
+  $^2$Same CV protocol, thresholds tuned on inner folds.
+  $^3$No tunable hyperparameters; bootstrap CI only.
+  $^4$\texttt{claude-haiku-4-5-20251001}, default temperature; bootstrap CI
+  only. Estimated cost: {\raise.17ex\hbox{$\scriptstyle\sim$}}\$0.10 for all
+  101 pairs.}
+\end{table*}
+
+\begin{table}[h]
+  \caption{Per-direction SILENT F1 for all four methods (bootstrap 95\% CI,
+    $n=101$ pairs). SILENT\_FDA ($n=13$): FDA is silent, EMA regulates.
+    SILENT\_EMA ($n=8$): EMA is silent, FDA regulates.}
+  \label{tab:silent_direction}
+  \small
+  \begin{tabular}{lll}
+    \toprule
+    Method & SILENT\_FDA F1 [95\% CI] & SILENT\_EMA F1 [95\% CI] \\
+    \midrule
+    Lexical heuristic
+      & 0.277 [0.000--0.545] & 0.393 [0.000--0.706] \\
+    NLI cross-encoder
+      & 0.049 [0.000--0.167] & 0.000 [0.000--0.000] \\
+    Graph-RAG pair-level
+      & 0.716 [0.516--0.882] & 0.535 [0.267--0.762] \\
+    \textbf{LLM judge (Haiku)}
+      & \textbf{0.795 [0.588--0.952]} & \textbf{0.738 [0.429--0.952]} \\
+    \bottomrule
+  \end{tabular}
+  \smallskip\\
+  {\small SILENT-FDA: 13 pairs (FDA silent, EMA active). SILENT-EMA: 8 pairs
+    (EMA silent, FDA active). Wide CIs on SILENT-EMA reflect the small stratum
+    ($n=8$). Bootstrap 1{,}000 resamples; stratified by 3-class label.}
+\end{table}
+
+Point estimates increase monotonically from lexical to Graph-RAG to the LLM
+judge. At $n = 101$ the marginal bootstrap CIs partially overlap, so we report
+these as a consistent ranking trend rather than a claim of statistical
+significance; a paired significance test is left to future work.
+\textbf{Lexical ceiling.} Characteristic errors share the signature of
+\textit{high lexical overlap, opposed regulatory stance}: FDA
+``modified Mayo score of 5--9'' vs.\ EMA ``full Mayo score of 9--12''
+(same vocabulary, different instrument); FDA 15-year LTF vs.\ EMA
+case-by-case (same topic, different specificity). Resolving these requires
+representing what each requirement \textit{asserts}, not surface similarity.
+
+%% -------------------------------------------------------------------------
+\section{Analysis}
+\label{sec:discussion}
+%% -------------------------------------------------------------------------
+
+\subsection{What the Baseline Hierarchy Reveals}
+
+\textbf{Observation 1 --- SILENT is semantically detectable but invisible to
+NLI framing.} SILENT F1 = 0.025 under NLI (no native SILENT class) vs.\ 0.778
+under the LLM judge (explicit definition). This contrast is large and consistent
+across bootstrap resamples; it reflects a structural constraint---the SILENT
+class requires a formulation that can express absence, which NLI entailment
+cannot---rather than a model-capacity effect. We note this observation is based
+on a distilbert-class model; a higher-capacity NLI encoder would improve
+AGREE/DIVERGE F1 but would not resolve the absence-detection gap without
+task-specific supervision (\S\ref{sec:discussion}).
+
+\textbf{Observation 2 --- For Claude Haiku on this dataset, pair-level
+obligation graphs improve over lexical (+0.15 F1) but trail flat prompting
+($-$0.17 F1); CIs partially overlap at pilot scale.} The graph makes the
+obligation structure explicit (MANDATORY / RECOMMENDED / etc.), which helps
+distinguish clear stance differences from similar-sounding text. But it
+discards full-text context that flat prompting uses to separate
+\textit{same-requirement / different-modal-register} (AGREE) from
+\textit{same-topic / different-threshold} (DIVERGE). Pairs like gene-01 (FDA
+15 years vs.\ EMA case-by-case) both extract as RECOMMENDED and the graph
+calls them AGREE; the flat LLM correctly identifies the threshold conflict from
+the text~\citep{qian2026evidenceforce}.
+\textit{Scope note.} Both the graph classifier and the flat LLM judge use
+Claude Haiku; this comparison is a within-model ablation (with vs.\ without
+explicit graph structure) rather than a general claim about graph methods vs.\
+LLM methods. Replication with a second model family is left to future work.
+
+\textbf{Observation 3 --- Two distinct problem scopes suggest two distinct
+architectural targets.} The \textit{pair-level scope} --- given pre-aligned
+sentences, label AGREE/DIVERGE/SILENT --- is largely addressed by the flat
+LLM judge (0.830), approaching a task ceiling. The \textit{corpus-level scope}
+--- ``is EMA silent on this topic \textit{anywhere} across its guideline
+corpus?'' --- requires finding aligned pairs, not just classifying them; a
+pairwise LLM cannot address this, but a corpus-level policy graph can. These
+are different tasks. This paper establishes baselines for the pair-level scope;
+\S\ref{sec:futurework} motivates the corpus-level architecture as the next
+contribution. This observation is architectural and directional; it is not a
+validated finding.
+
+\subsection{Source-Stratified Performance Analysis}
+\label{sec:source_stratified}
+
+To assess whether performance reflects source-study-specific patterns rather
+than genuine task competence, we analyse performance stratified by track and
+by source concentration.
+
+\textbf{Track-level.} On AGREE/DIVERGE classes, the LLM judge scores
+\textit{lower} on Track A (0.769/0.745) than Track B (0.966/0.923): exposure
+to source studies does not inflate performance. The macro-F1 gap (Track B 0.630
+vs.\ Track A 0.765) is explained by SILENT support ($n = 0$ vs.\ $n = 21$),
+not memorisation.
+
+\textbf{Source-concentration.} 40/101 pairs come from one source
+(\citeauthor{uc2025jcc}). LLM judge on the JCC stratum ($n = 40$): 0.804;
+on all other pairs ($n = 61$): 0.844. Performance is marginally
+\textit{higher} outside JCC, ruling out domain-concentration inflation.
+
+%% -------------------------------------------------------------------------
+\section{Future Work}
+\label{sec:futurework}
+%% -------------------------------------------------------------------------
+
+\textbf{Corpus-level policy graph.}
+The correct long-term target is corpus-level silent detection and divergence
+discovery: (1) build per-jurisdiction policy graphs indexing all FDA/EMA
+guidance at corpus scale; (2) align requirement nodes via entity normalisation
+and embedding similarity; (3) classify aligned pairs as AGREE/DIVERGE/SILENT by
+obligation-structure comparison; (4) generate natural-language explanations.
+This architecture subsumes the pair-alignment assumption: alignment becomes a
+graph-construction step, not a pre-processing input.
+
+\textbf{RegDivergence-500.}
+Four domains are unrepresented in the pilot: CMC, adaptive trial design/estimands,
+statistical analysis plan requirements, and labelling/SmPC. RegDivergence-500
+($\approx$500 pairs) will cover all four via a community-annotation pipeline
+seeded from a $\sim$45-source FDA/EMA comparison inventory.
+Annotation guidelines are released with this paper. A third jurisdiction (PMDA)
+via FDA/EMA/PMDA concordance studies~\cite{mita2026doses,gomezfernandez2026inhibitors}
+will add an $\approx$40-pair FDA$\times$PMDA subset. Multi-model replication and
+an independent third-annotator validation pass are planned.
+A cross-pair generalisation probe against Sino-US-DrugQA~\cite{sinousdrugqa2026}
+will be the first test of whether conclusions transfer beyond the FDA/EMA pair.
+
+%% -------------------------------------------------------------------------
+\section{Limitations}
+\label{sec:limitations}
+%% -------------------------------------------------------------------------
+
+\textbf{Topic alignment.} Track B co-topicality judgements are single-annotator;
+Track A inherits source-study alignment methodology. Reproducibility depends on
+the released exclusion-criteria checklist (\texttt{data/alignment\_protocol.md}).
+
+\textbf{Scale and coverage.} 101 pairs from three source studies limits
+statistical power (directional observations, not confirmed findings). Oncology,
+rare diseases, medical devices, and vaccines are absent. RegDivergence-500
+(\S\ref{sec:futurework}) is required before domain-general conclusions.
+
+\textbf{SILENT labels.} All 21 SILENT pairs carry \texttt{doc\_confidence = MODERATE};
+treat them as soft labels. The pair-level SILENT task is a proxy for the correct
+corpus-level formulation (\S\ref{sec:futurework}).
+
+\textbf{Single-model evaluation.} All LLM-dependent components (triplet extraction,
+graph classification, flat judge, annotation check) use Claude Haiku. The
+Graph-RAG vs.\ LLM comparison is a within-model ablation, not a cross-model
+comparison. The $\kappa = 0.542$ LLM consistency check reflects the same model's
+label tendencies. Multi-model replication is deferred to RegDivergence-500.
+
+\textbf{Contamination.} Haiku may have seen FDA/EMA guidance during pretraining.
+The source-stratified analysis (\S\ref{sec:source_stratified}) provides evidence
+against inflation; future work should evaluate on post-cutoff guidance.
+
+\textbf{Use norms.} RegDivergence-101 is a pilot benchmark: not sufficient for
+deployment decisions, not domain-generalizable without held-out evaluation, and
+not a sole criterion for AI procurement in regulatory-affairs workflows.
+Conclusions are specific to the FDA/EMA pair until cross-pair generalisation
+probes are run.
+
+%% -------------------------------------------------------------------------
+\section{Conclusion}
+%% -------------------------------------------------------------------------
+
+We introduced cross-jurisdiction regulatory divergence detection, released
+\textbf{RegDivergence-101}, a 101-pair expert-grounded \textbf{pilot}
+evaluation benchmark ($\kappa = 0.85$, documented two-track pair-construction
+protocol, per-direction SILENT annotation), and characterised a four-method
+baseline hierarchy with bootstrap CIs. Three directional observations at pilot
+scale ($n = 101$, CIs partially overlapping for adjacent methods): SILENT
+requires explicit absence-aware formulation (NLI F1 0.03 $\to$ LLM F1 0.78);
+for Claude Haiku on this dataset, pair-level graph structure improves over
+lexical heuristics (+0.15 F1) but trails flat prompting ($-$0.17 F1); and
+the two-scope distinction (pair-level vs.\ corpus-level) motivates the
+corpus-level graph architecture as the next contribution. The flat LLM judge
+(0.830) establishes a pair-level performance reference at pilot scale; the
+corpus-level architecture proposed in \S\ref{sec:futurework} is the correct
+target for large-scale silence discovery. The benchmark is a pilot: four regulatory domains (CMC,
+clinical trial design, statistical analysis, labelling) remain unrepresented,
+and the planned RegDivergence-500 extension with expanded dual-annotation will
+establish the task at production scale.
+
+%%
+%% Acknowledgments
+%%
+\begin{acks}
+This work was conducted independently. Benchmark pairs were derived from
+publicly available FDA/EMA guidance documents and open-access peer-reviewed
+comparison studies. LLM API calls used the Anthropic API (Claude Haiku,
+\texttt{claude-haiku-4-5-20251001}).
+\end{acks}
+
+%%
+%% Bibliography
+%%
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{xjurisdiction-divergence}
+
+%%
+%% Appendix
+%%
+\appendix
+
+\section{Prompts and Code}
+\label{app:prompt}
+
+Full prompts (LLM judge system/user, Graph-RAG Stage~1 triplet-extraction,
+Stage~2 graph-classification), evaluation scripts, and dataset schema are
+available at the project repository:
+\url{https://github.com/chuchugo/cross-jurisdiction-regulatory-divergence}
+
+\noindent\textbf{LLM judge} (\texttt{llm\_judge.py}): system prompt defines
+AGREE/DIVERGE/SILENT with explicit absence framing; user prompt pairs
+\texttt{\{fda\_text\}} and \texttt{\{ema\_text\}}.
+Model: \texttt{claude-haiku-4-5-20251001}, temperature 1.0, max tokens 100.
+
+\noindent\textbf{Graph-RAG} (\texttt{graph\_rag.py}): Stage~1 extracts a
+policy node \texttt{\{subject, obligation\_level, requirement, conditions\}};
+Stage~2 classifies the aligned node pair. Hard rules: MANDATORY
+$\leftrightarrow$ PROHIBITED $\Rightarrow$ DIVERGE (no LLM call); both
+SILENT $\Rightarrow$ SILENT. Max tokens: 300.
+
+\end{document}
